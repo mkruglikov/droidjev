@@ -1,0 +1,22 @@
+{
+  "name": "droidjev",
+  "version": "0.2.0",
+  "description": "DroidJev — fast jev-powered Android emulator clicker: view hierarchy in, adb taps out. No screenshots.",
+  "type": "module",
+  "repository": { "type": "git", "url": "git+https://github.com/mkruglikov/droidjev.git" },
+  "homepage": "https://github.com/mkruglikov/droidjev#readme",
+  "bugs": "https://github.com/mkruglikov/droidjev/issues",
+  "files": ["src/", "skill/"],
+  "bin": { "droidjev": "src/cli.js" },
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage",
+    "lint": "npx --yes eslint@10.11.0 src test",
+    "format": "npx --yes prettier@3.9.8 --write src test eslint.config.js",
+    "format:check": "npx --yes prettier@3.9.8 --check src test eslint.config.js",
+    "prepublishOnly": "npm test"
+  },
+  "license": "MIT",
+  "keywords": ["android", "emulator", "adb", "automation", "typesafe", "jev", "agent", "accessibility"]
+}

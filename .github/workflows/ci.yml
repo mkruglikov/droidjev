@@ -1,0 +1,29 @@
+name: ci
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 24] # engines floor + current LTS
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test
+      - run: for f in src/*.js; do node --check "$f"; done # node --check takes ONE file
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm # eslint/prettier land in ~/.npm via npx; a warm cache skips the ~40s download
+          cache-dependency-path: package.json # zero-dep repo: no lock file to hash
+      - run: npx --yes eslint@10.11.0 src test
+      - run: npx --yes prettier@3.9.8 --check src test eslint.config.js
