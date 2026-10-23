@@ -4,11 +4,32 @@
 import { createHash } from 'node:crypto';
 
 const MAX_ROWS = 80;
+// Top fraction of the screen where the platform's chrome package is a status
+// bar rather than content.
+const STATUS_BAR_FRACTION = 0.06;
+const CHROME_PKGS = new Set(['com.android.systemui']);
 
 const classShort = (cls) => (cls || '').split('.').pop() || '';
 const resourceIdTail = (id) => (id || '').split('/').pop() || id || '';
 
 export const isEditable = (el) => /EditText|Editable|AutoCompleteTextView|TextInput/.test(el.class || '');
+
+// A slider is a track with a thumb: the value follows the touch position, so
+// the only way to set it is a drag. Android's SeekBar and Material's Slider
+// both report the value as the element's own text, which is what lets the
+// model read the current position off the row.
+export const isSlider = (el) => /SeekBar|RangeSlider|\.Slider$|(^|\.)Slider\b/.test(el.class || '');
+
+// A row whose text is a date: a calendar header, a task's due chip. Flagged
+// because clicking it opens a date picker — the fast route to a date the goal
+// names, next to a calendar's day-by-day arrows.
+const DATE_LABEL = new RegExp(
+  '^(?:\\d{4}-\\d{1,2}-\\d{1,2}' +
+    '|\\d{1,2}/\\d{1,2}/\\d{2,4}' +
+    '|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?)' +
+    '(?:\\s|$)',
+);
+export const isDateLabel = (text) => DATE_LABEL.test(String(text || '').trim());
 
 function cleanLabel(s) {
   const t = String(s || '')
@@ -90,6 +111,26 @@ const isHelperEl = (el) =>
   cleanLabel(el.text) === 'Appium Settings' ||
   cleanLabel(el.contentDesc) === 'Appium Settings';
 
+// The largest group of same-sized, unlabeled, interactive elements laid out in
+// rows and columns — a drawn grid (a calendar month, a canvas, a dial pad with
+// drawn digits). Returns the group so callers can both drop it from the table
+// and describe what was dropped.
+function drawnGrid(elements) {
+  const groups = new Map();
+  for (const el of elements) {
+    if (!el.bounds || cleanLabel(el.text) || cleanLabel(el.contentDesc)) continue;
+    if (!(el.clickable || el.longClickable || el.checkable || isEditable(el))) continue;
+    const key = `${el.bounds.r - el.bounds.l}x${el.bounds.b - el.bounds.t}`;
+    groups.set(key, [...(groups.get(key) || []), el]);
+  }
+  let best = null;
+  for (const [size, cells] of groups) {
+    if (cells.length < 6 || new Set(cells.map((c) => c.bounds.l)).size < 3) continue;
+    if (!best || cells.length > best.cells.length) best = { size, cells };
+  }
+  return best;
+}
+
 export function buildTable(elements, screen) {
   // A helper's launcher icon is its clickable container (which carries no
   // label of its own) — drop the container with the helper node (its direct
@@ -104,8 +145,25 @@ export function buildTable(elements, screen) {
       if (p && !p.scrollable) hidden.add(el.parentIdx);
     }
   });
-  const visible = elements.filter((el, i) => !hidden.has(i) && onScreen(el, screen));
-  const labeled = visible.filter((el) => cleanLabel(el.text) || cleanLabel(el.contentDesc));
+  // The status bar is chrome, not the app: its clock, battery and notification
+  // icons belong to another package and sit in the top band. A clock reading
+  // "15:34" looks exactly like a time field waiting to be filled in — observed
+  // as a step spent tapping it in an event editor — and an answer picked from
+  // it is wrong. Dialogs from other packages (the brightness slider) are not in
+  // that band, so they stay.
+  // Only the platform's own chrome package, and only in the top band: an app's
+  // rows are never dropped, whatever the dump's ordering.
+  const isStatusBar = (el) =>
+    !!screen && CHROME_PKGS.has(el.pkg) && el.bounds && el.bounds.b <= screen.h * STATUS_BAR_FRACTION;
+  const visible = elements.filter((el, i) => !hidden.has(i) && !isStatusBar(el) && onScreen(el, screen));
+  // A grid of same-sized unlabeled cells is drawn, not described: a calendar's
+  // month, a canvas. The model cannot tell one cell from another, so tapping
+  // them is guessing — and 40 of them crowd out the rows that do carry a label.
+  // They are dropped from the table and reported as a note instead, which is
+  // what points the model at the text route (a view switcher, a picker).
+  const grid = drawnGrid(visible);
+  const shown = grid ? visible.filter((el) => !grid.cells.includes(el)) : visible;
+  const labeled = shown.filter((el) => cleanLabel(el.text) || cleanLabel(el.contentDesc));
 
   const entry = (el) => {
     const interactive = el.clickable || el.longClickable || el.scrollable || el.checkable || isEditable(el);
@@ -118,6 +176,8 @@ export function buildTable(elements, screen) {
     if (el.scrollable) flags.push('scroll');
     if (isEditable(el)) flags.push('edit');
     if (el.checkable) flags.push(el.checked ? 'check=on' : 'check=off');
+    if (isSlider(el)) flags.push('range');
+    if (isDateLabel(label)) flags.push('date');
     if (el.selected) flags.push('selected');
     if (el.focused) flags.push('focused');
     let row = `[${rows.length}] ${flags.join('+') || 'text'}`;
@@ -135,7 +195,7 @@ export function buildTable(elements, screen) {
   // Interactive elements win the cap: a dropped clickable target can never be
   // recovered by scrolling blind. Context (text-only) rows fill the remainder.
   const rows = [];
-  const entries = visible.map(entry).filter(Boolean);
+  const entries = shown.map(entry).filter(Boolean);
   for (const e of entries) {
     if (!e.interactive) continue;
     e.idx = rows.length;
@@ -152,6 +212,7 @@ export function buildTable(elements, screen) {
   }
   truncated = truncated || entries.length > rows.length;
   Object.defineProperty(rows, 'truncated', { value: truncated, enumerable: false });
+  Object.defineProperty(rows, 'grid', { value: grid, enumerable: false });
   return rows;
 }
 
@@ -160,16 +221,106 @@ export function serializeRows(table) {
   return table.map((r) => r.row);
 }
 
-// Scroll anchor: largest scrollable element's center, else screen middle.
+// Scroll anchor: the scrollable that holds the focus wins (a number picker or
+// a small inner list is the thing a swipe must move, and a swipe anywhere else
+// scrolls the wrong container — or, with the keyboard up, glides over its
+// keys). The innermost holder wins: a page contains the picker contains the
+// focused cell, and the picker is what has to move. Otherwise the largest
+// scrollable's center, else the screen middle.
 export function scrollAnchor(table, screen) {
-  let best = null;
-  for (const { el } of table) {
+  const focused = table.find((r) => r.el.focused && r.el.bounds);
+  const scrollables = table.filter((r) => r.el.scrollable && r.el.bounds);
+  const holders = focused ? scrollables.filter((r) => contains(r.el.bounds, focused.el.bounds)) : [];
+  const area = (r) => (r.el.bounds.r - r.el.bounds.l) * (r.el.bounds.b - r.el.bounds.t);
+  const smallest = holders.reduce((a, b) => (a === null || area(b) < area(a) ? b : a), null);
+  const largest = scrollables.reduce((a, b) => (a === null || area(b) > area(a) ? b : a), null);
+  const chosen = smallest ?? largest;
+  return chosen ? centerOf(chosen.el) : { x: Math.round(screen.w / 2), y: Math.round(screen.h / 2) };
+}
+
+const contains = (outer, inner) =>
+  inner.l >= outer.l - 2 && inner.t >= outer.t - 2 && inner.r <= outer.r + 2 && inner.b <= outer.b + 2;
+
+// Providers set center alongside bounds; a host-supplied table may not, and a
+// gesture needs a point either way.
+const centerOf = (el) =>
+  el.center ?? { x: Math.round((el.bounds.l + el.bounds.r) / 2), y: Math.round((el.bounds.t + el.bounds.b) / 2) };
+
+// The scrollable a horizontal gesture must start on, or null when no dump
+// signal says the axis is horizontal: a class that names it, or a short wide
+// container whose clickable children sit side by side (a row of cards, a
+// pager's pages). The rest of the time the axis is unknowable from the tree —
+// an off-screen page is simply not in it — so vertical stays the only offered
+// direction.
+export function horizontalAnchor(table, screen) {
+  const h = screen?.h ?? 2340;
+  const named = table.find(
+    (r) =>
+      r.el.scrollable &&
+      r.el.bounds &&
+      /HorizontalScrollView|ViewPager|Pager|Carousel|Gallery|TabLayout/i.test(r.el.class || ''),
+  );
+  if (named?.el.bounds) return centerOf(named.el);
+  for (const r of table) {
+    const el = r.el;
     if (!el.scrollable || !el.bounds) continue;
-    const area = (el.bounds.r - el.bounds.l) * (el.bounds.b - el.bounds.t);
-    if (!best || area > best.area) best = { area, center: el.center };
+    const { l, t, r: right, b } = el.bounds;
+    const tall = b - t;
+    if (tall < 1 || tall > h * 0.4 || right - l < tall * 2) continue;
+    const band = (x) => x.t >= t - 2 && x.b <= b + 2;
+    const inside = table.filter(
+      (x) => x.el !== el && x.el.bounds && band(x.el.bounds) && contains(el.bounds, x.el.bounds),
+    );
+    if (new Set(inside.map((x) => x.el.bounds.l)).size >= 2) return centerOf(el);
   }
-  if (best?.center) return best.center;
-  return { x: Math.round(screen.w / 2), y: Math.round(screen.h / 2) };
+  return null;
+}
+
+// The rows a container holds: geometry is the only parent link both providers
+// (and a host-supplied table) are guaranteed to have. Used to read a list's
+// items off the screen in order.
+//
+// A row and its own label are both in the table (the container row carries the
+// adopted label, the child TextView its own text), so containment drops the
+// inner duplicate: one item, one entry. Order is visual (top, then left) —
+// table order is interactive-first, which is not how the list reads.
+export function listItems(table, idx) {
+  const container = table.find((r) => String(r.idx) === String(idx));
+  if (!container?.el.bounds) return [];
+  const inside = table.filter(
+    (r) =>
+      r !== container && r.el.bounds && contains(container.el.bounds, r.el.bounds) && (r.el.text || r.el.contentDesc),
+  );
+  const outermost = inside.filter((r) => !inside.some((o) => o !== r && contains(o.el.bounds, r.el.bounds)));
+  const seen = new Set();
+  return outermost
+    .sort((a, b) => a.el.bounds.t - b.el.bounds.t || a.el.bounds.l - b.el.bounds.l)
+    .filter((r) => {
+      const text = elementText(r.el);
+      if (seen.has(text)) return false;
+      seen.add(text);
+      return true;
+    });
+}
+
+// The text a row contributes to the clipboard or to an answer: the element's
+// own text, single-spaced.
+export const elementText = (el) =>
+  String(el.text || el.contentDesc || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+// A grid of same-sized, unlabeled, clickable cells is drawn rather than
+// described: a calendar's month, a drawing canvas, a dial pad. The model sees
+// the cells and not what is on them, so tapping them is guessing — the note
+// says so, which is what sends it looking for a text route instead.
+export function gridNote(table) {
+  const grid = table.grid;
+  if (!grid) return null;
+  return (
+    `a ${grid.size} grid of ${grid.cells.length} unlabeled cells was left out of the list: what each cell` +
+    ' holds is drawn, not text, so it cannot be told from its neighbours — reach that data by a text route instead'
+  );
 }
 
 // Change detection between consecutive tables: content only (labels, states,

@@ -23,8 +23,11 @@ be written in the UI's language.
   never produces coordinates, selectors, or commands — only an index into our
   table, which code resolves to a tap position.
 - **One decision per step.** A single request asks `operation` — with
-  `click_<idx>`/`type_<idx>`/`copy_<idx>` options for concrete elements offered
-  alongside scroll/back/home/paste/wait/done/blocked — and `goal_met` in parallel. The
+  `click_<idx>`/`hold_<idx>`/`type_<idx>_<k>`/`copy_<idx>`/`answer_<idx>` options
+  for concrete elements offered alongside `launch_<k>` (an app the host can open
+  by name), `set_<idx>_<k>` (a slider stop), `clip_<k>` (a goal value onto the
+  clipboard) and scroll/back/home/paste/wait/done/blocked — and `goal_met` in
+  parallel. The
   model cannot point at the right element while declining to click it: the
   target and the action are the same judgment, and its argmax is executed
   as-is. A key-less HEAD pre-warms the HTTPS connection during the initial
@@ -34,6 +37,23 @@ be written in the UI's language.
   then that settled dump doubles as the previous action's verification (hash
   comparison). Scroll flings get a short cap (a mid-flight dump is readable);
   screen transitions wait for motion to complete.
+- **Options are what the host can execute.** The question set is assembled from
+  the capabilities the caller declares: a host with no clipboard passes
+  `clipboard: false` and never sees `copy_`/`paste`, one whose goal is a
+  question passes `answers: true` and gets `answer_<idx>` (submit a row's own
+  text), `answer_list_<idx>` (submit a list's items joined with commas) and
+  `answer_text_<k>` (submit a goal value verbatim) — the model still only ever
+  picks, and droidjev resolves the text. An editable row is offered as
+  `type_<idx>_<k>` rather than `click_<idx>`: clicking a field only focuses it,
+  which is the trap a date picker sets.
+- **The table is filtered, not dumped.** Status-bar chrome from the platform's
+  own package is dropped (a clock reading "15:34" looks exactly like a time
+  field), and a grid of same-sized unlabeled cells — a calendar's month, a
+  canvas — is left out with a note saying so, because the model cannot tell one
+  drawn cell from another and 40 of them crowd out the rows that do carry a
+  label. Rows carry structural flags the model can act on: `range` (a slider
+  whose value is its own text), `date` (a row that opens a date picker),
+  `check=on|off`, `edit`, `scroll`.
 - **`copy_<idx>` copies text that cannot be selected.** Static labels (the
   "17" next to "Android version") have no long-press copy menu; the model
   picks the value row and its exact text goes to the device clipboard through

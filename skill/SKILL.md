@@ -50,6 +50,12 @@ Give `act` the complete compound goal in one shot ("open language settings,
 pick Русский, confirm the dialog"), not a chain of micro-goals — the model
 keeps context inside one run and every restart re-navigates from scratch.
 
+Beyond taps, typing and scrolling (both axes), the loop can long-press an item
+to open its context menu (rename/delete/share), drag a slider to its minimum,
+maximum, middle or a percentage, copy on-screen text to the clipboard and
+paste it into a focused field, and — with `--answer` — submit an answer to a
+question goal instead of changing the screen.
+
 Read the last line: `status=done steps=3 6.3s tokens=4430/770 app=com.android.settings`.
 Trust `status=done` — the model answers done only when the current screen
 shows the goal achieved, and `app=` shows the focused app.
@@ -63,6 +69,8 @@ missing android CLI where needed, missing TYPESAFE_API_KEY, no AVD).
 |---|---|
 | `--device SERIAL\|AVD` | target when several emulators run (else: sole online, else auto-boot first AVD) |
 | `--text "…"` | value to type when the goal needs typing — the model picks the field, never the text; repeat once per value the goal names (`--text Maria --text +79001234567`) |
+| `--app "Label=package"` | an app the model may open by name in one step — repeatable; a bare package is labelled by its last segment. It removes the walk through the launcher (and the ambiguity of two icons with the same label); the model still chooses which app the goal means |
+| `--answer` | the goal is a question: the `answer_*` options are offered and the submitted text is printed as `answer:` on exit 0 |
 | `--max-steps N` | action budget for act (default 12) |
 | `--max-iterations N` | (find) scroll budget (default 20) |
 | `--no-animations` | disable device animations for the run (restored after; steps verify sooner) |
@@ -93,6 +101,17 @@ will not type a wrong value into the field).
 
 - Sleeping display is handled automatically (wake before every gesture); an
   emulator with a PIN lock stays blocked.
+- A host that already has its own observation and action pipeline (a test
+  harness, a web driver) can embed just the decision: `droidjev decide` reads a
+  JSON request on stdin (`goal`, `elements`, `screen`, `provided_texts`,
+  `apps`, `recent_actions`, `recent_choices`, `last_unchanged`, `can_scroll`,
+  `copied`, `clipboard`, `clipboard_ready`, `answers`, `today`) and answers
+  with the chosen operation, plus everything the host needs to execute it
+  without re-deriving anything: `centers` (tap points), `texts` (each row's
+  own text, for copy/answer), `drags` (the swipe a `set_*` slider stop needs)
+  and `answer` (the resolved answer text). Same element table, same questions,
+  same strict validation as `act`, no adb. Use `--serve` to keep one process
+  for a whole run.
 - Do not call `uiautomator` by hand — UiAutomation is exclusive device-wide
   and conflicts with droidjev's resident layout server; `snapshot` already
   exposes the same data.
