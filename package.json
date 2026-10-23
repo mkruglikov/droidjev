@@ -1,7 +1,7 @@
 {
   "name": "droidjev",
   "version": "0.3.0",
-  "description": "DroidJev — fast jev-powered Android emulator clicker: view hierarchy in, adb taps out. No screenshots.",
+  "description": "DroidJev — fast jev-powered Android emulator clicker: view hierarchy first, screenshots only for blind screens.",
   "type": "module",
   "repository": {
     "type": "git",

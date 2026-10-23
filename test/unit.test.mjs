@@ -10,7 +10,10 @@ import {
   elementText,
   isDateLabel,
 } from '../src/elements.js';
-import { validatedChoice, validatedNoul } from '../src/typesafe.js';
+import { validatedChoice, validatedNoul, validatedBox } from '../src/typesafe.js';
+import { parseScreencap, scaleTarget, downscaleRgba, encodePng } from '../src/shot.js';
+import { inflateSync } from 'node:zlib';
+import { run } from '../src/util.js';
 import { sanitizeInputText, slideGesture } from '../src/act.js';
 import { redact } from '../src/util.js';
 import { parseArgs, parseApp } from '../src/cli.js';
@@ -24,6 +27,10 @@ import {
   sliderStops,
   answerFor,
   stuckOps,
+  buildVisionQuestions,
+  visionVerdict,
+  boxCenter,
+  TAP_BOX_MIN_CONFIDENCE,
 } from '../src/agent.js';
 import { buildDecideRequest, decide, serveDecide } from '../src/decide.js';
 
@@ -998,4 +1005,163 @@ test('a split name/extension dialog is explained when the goal names a file', ()
   assert.match(withFile.operation.instructions.rules.join('\n'), /extension field/);
   const noFile = buildQuestions({ goal: 'turn off wifi', table, texts: ['5'] });
   assert.ok(!/extension field/.test(noFile.operation.instructions.rules.join('\n')), 'and stays out of other goals');
+});
+
+// ---- vision fallback (screenshot → image asset → box answer) ----
+
+test('run(binary) keeps stdout bytes untouched', async () => {
+  const r = await run(process.execPath, ['-e', 'process.stdout.write(Buffer.from([0x89,0x50,0x00,0xff,0xfe]))'], {
+    binary: true,
+  });
+  assert.ok(Buffer.isBuffer(r.stdout), 'stdout stays a Buffer');
+  assert.deepEqual([...r.stdout], [0x89, 0x50, 0x00, 0xff, 0xfe]);
+});
+
+test('parseScreencap detects 16- and 12-byte headers and rejects bad payloads', () => {
+  const px = Buffer.alloc(2 * 2 * 4, 0xaa);
+  const h16 = Buffer.alloc(16);
+  h16.writeUInt32LE(2, 0);
+  h16.writeUInt32LE(2, 4);
+  h16.writeUInt32LE(1, 8);
+  h16.writeUInt32LE(1, 12);
+  assert.equal(parseScreencap(Buffer.concat([h16, px])).offset, 16);
+  const h12 = h16.subarray(0, 12);
+  assert.equal(parseScreencap(Buffer.concat([h12, px])).offset, 12);
+  assert.throws(() => parseScreencap(Buffer.concat([h16, px.subarray(0, 4)])), /payload/);
+  const bad = Buffer.alloc(12);
+  bad.writeUInt32LE(2, 0);
+  bad.writeUInt32LE(2, 4);
+  bad.writeUInt32LE(99, 8);
+  assert.throws(() => parseScreencap(Buffer.concat([bad, px])), /header/);
+});
+
+test('scaleTarget fits the TypeSafe image limits from both directions', () => {
+  const t = scaleTarget(1080, 2340);
+  assert.ok(Math.max(t.w, t.h) <= 1568, `longest side ≤1568: ${t.w}x${t.h}`);
+  assert.ok(t.w * t.h <= 2458624 && t.w * t.h >= 78400, `pixel count in range: ${t.w * t.h}`);
+  assert.deepEqual(scaleTarget(240, 320), { w: 280, h: 373 }, 'a tiny screen is upscaled to the 280px floor');
+  const same = scaleTarget(720, 1280);
+  assert.deepEqual(same, { w: 720, h: 1280 }, 'an in-range screen passes through 1:1');
+});
+
+test('downscaleRgba averages the covered source rectangle', () => {
+  const src = { w: 2, h: 2, format: 1, bpp: 4, offset: 0 };
+  const buf = Buffer.from([255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255]);
+  assert.deepEqual([...downscaleRgba(buf, src, { w: 1, h: 1 })], [128, 128, 128]);
+});
+
+test('encodePng emits a structurally valid minimal PNG', () => {
+  const rgb = Uint8Array.from([255, 0, 0, 0, 255, 0, 0, 0, 255, 1, 2, 3]);
+  const png = encodePng(rgb, 2, 2);
+  assert.deepEqual([...png.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  // Reference CRC32 to check every chunk independently of the encoder's table.
+  const crcOf = (buf) => {
+    let c = 0xffffffff;
+    for (const b of buf) {
+      c ^= b;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    }
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const chunks = [];
+  let off = 8;
+  while (off < png.length) {
+    const len = png.readUInt32BE(off);
+    const type = png.subarray(off + 4, off + 8).toString('ascii');
+    const data = png.subarray(off + 8, off + 8 + len);
+    assert.equal(png.readUInt32BE(off + 8 + len), crcOf(png.subarray(off + 4, off + 8 + len)), `${type} CRC`);
+    chunks.push([type, data]);
+    off += 12 + len;
+  }
+  assert.deepEqual(
+    chunks.map(([t]) => t),
+    ['IHDR', 'IDAT', 'IEND'],
+  );
+  const [, ihdr] = chunks[0];
+  assert.equal(ihdr.readUInt32BE(0), 2);
+  assert.equal(ihdr.readUInt32BE(4), 2);
+  assert.equal(ihdr[8], 8);
+  assert.equal(ihdr[9], 2);
+  const scan = inflateSync(chunks[1][1]);
+  // (stride 6 + filter byte) × 2 rows = 14 bytes: filter-0 per scanline.
+  assert.deepEqual([...scan], [0, 255, 0, 0, 0, 255, 0, 0, 0, 0, 255, 1, 2, 3]);
+});
+
+test('validatedBox accepts bounded rectangles, nullable confidence included', () => {
+  const good = validatedBox(
+    { type: 'box', box: { top: 0.25, bottom: 0.82, left: 0.44, right: 0.84 }, confidence: 0.92 },
+    'tap_target',
+  );
+  assert.equal(good.confidence, 0.92);
+  assert.equal(validatedBox({ box: { top: 0, bottom: 1, left: 0, right: 1 }, confidence: null }, 't').confidence, null);
+  assert.throws(() => validatedBox({ box: { top: 0.5, bottom: 0.4, left: 0, right: 1 } }, 't'), /rectangle/);
+  assert.throws(() => validatedBox({ box: { top: -0.1, bottom: 1, left: 0, right: 1 } }, 't'), /out of range/);
+  assert.throws(() => validatedBox({ box: { top: 0, bottom: 2, left: 0, right: 1 } }, 't'), /out of range/);
+  assert.throws(() => validatedBox({ confidence: 0.5 }, 't'), /missing box/);
+  assert.throws(
+    () => validatedBox({ box: { top: 0, bottom: 1, left: 0, right: 1 }, confidence: 1.5 }, 't'),
+    /confidence/,
+  );
+  assert.throws(() => validatedBox('x', 't'), /missing answer/);
+});
+
+test('buildVisionQuestions offers the vision op set and embeds the image reference', () => {
+  const ref = 'b04c0ed6-refs';
+  const q = buildVisionQuestions(ref);
+  assert.deepEqual(Object.keys(q.operation.criteria), [
+    'tap_box',
+    'scroll_down',
+    'scroll_up',
+    'back',
+    'home',
+    'wait',
+    'done',
+    'blocked',
+  ]);
+  assert.equal(q.screen_readable.type, 'noul');
+  assert.equal(q.tap_target.type, 'box');
+  assert.ok(q.tap_target.instructions.includes(`\`${ref}\``), 'box grounds on the asset reference');
+  assert.ok(!JSON.stringify(q.operation).includes(ref), 'the choice text carries no second image copy');
+});
+
+test('visionVerdict gates on the noul and the box confidence', () => {
+  const op = (choice) => ({ choice, confidence: 0.8 });
+  assert.deepEqual(
+    visionVerdict({ operation: op('tap_box'), screenReadable: { noul: 0.3 }, tapTarget: { box: {}, confidence: 0.9 } }),
+    { kind: 'blocked', reason: 'blind_screen' },
+    'an unreadable screen blocks regardless of the choice',
+  );
+  const box = { top: 0, bottom: 1, left: 0, right: 1 };
+  const tap = visionVerdict({
+    operation: op('tap_box'),
+    screenReadable: { noul: 0.9 },
+    tapTarget: { box, confidence: null },
+  });
+  assert.equal(tap.kind, 'tap');
+  assert.deepEqual(tap.box, box, 'null confidence does not withhold the tap');
+  assert.equal(
+    visionVerdict({
+      operation: op('tap_box'),
+      screenReadable: { noul: 0.9 },
+      tapTarget: { box, confidence: TAP_BOX_MIN_CONFIDENCE - 0.01 },
+    }).kind,
+    'skip_tap',
+  );
+  assert.deepEqual(
+    visionVerdict({
+      operation: op('scroll_down'),
+      screenReadable: { noul: 0.9 },
+      tapTarget: { box, confidence: null },
+    }),
+    { kind: 'op', choice: 'scroll_down', confidence: 0.8 },
+  );
+});
+
+test('boxCenter maps fractions to an integer screen point', () => {
+  assert.deepEqual(boxCenter({ left: 0.25, right: 0.75, top: 0.4, bottom: 0.6 }, { w: 1000, h: 2000 }), {
+    x: 500,
+    y: 1000,
+  });
+  const c = boxCenter({ left: 0.2, right: 0.3, top: 0.7, bottom: 0.71 }, { w: 1080, h: 2340 });
+  assert.ok(Number.isInteger(c.x) && Number.isInteger(c.y));
 });

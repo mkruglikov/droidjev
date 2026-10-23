@@ -1,6 +1,6 @@
 # DroidJev (`droidjev`)
 
-A fast, screenshot-free Android emulator clicker powered by
+A fast, text-first Android emulator clicker powered by
 [TypeSafe](https://docs.typesafe.ai)'s **jev** (System One) model.
 
 You give it a natural-language goal; it dumps the **view hierarchy**, asks jev
@@ -32,7 +32,11 @@ to the clipboard and **paste** it into a focused field, **open an app by name**
 (`--app`, one step from anywhere), and — for a question goal — **answer** with
 the text it found on screen (`--answer`) instead of changing anything. It never
 types a value you did not pass, and it never invents coordinates: every action
-resolves to a row of the dumped element table.
+resolves to a row of the dumped element table. The one exception is the
+**vision fallback**: when a screen exposes no accessibility nodes at all (WebView
+content, canvas renderers — previously a guaranteed dead end), the model is sent
+a downscaled screenshot and may answer with a strictly validated bounding box
+that code resolves to the tap point (`--no-vision` keeps even that off).
 
 ## Prerequisites
 
@@ -114,12 +118,14 @@ step; a bare package is labelled by its last segment) · `--answer` (the goal is
 question: offer the answer options and print the submitted answer) ·
 `--max-steps N` (act, default 12) · `--max-iterations N` (find, default 20) ·
 `--json` (full trace) · `--no-animations` (disable animations for the run;
-restored after).
+restored after) · `--no-vision` (never send screenshots — a screen with no
+accessibility nodes blocks instead of falling back to image+box answers).
 
 Exit codes: `0` done/found · `2` not achieved — `status=blocked` with
 `blockedReason` `model` (no action sequence can reach the goal, including a
 value the goal names that was not passed via `--text`) or
-`blind_screen` (the screen exposes no accessibility nodes), or
+`blind_screen` (the screen exposes no accessibility nodes and the vision
+fallback is off or its screenshot is unreadable), or
 `status=max_steps` (budget exhausted mid-navigation; the goal may still be
 reachable — re-run, decompose, or raise `--max-steps`) · `3` error.
 
@@ -133,7 +139,8 @@ reachable — re-run, decompose, or raise `--max-steps`) · `3` error.
 - **[Security model](https://github.com/mkruglikov/droidjev/blob/master/docs/security.md)** —
   API-key handling, subprocess spawning, and model-answer validation.
 - **[Known limits](https://github.com/mkruglikov/droidjev/blob/master/docs/known-limits.md)** —
-  blind screens, ASCII-only typing, top-down `find`, emulator-first targeting.
+  blind screens and the vision fallback, ASCII-only typing, top-down `find`,
+  emulator-first targeting.
 - **[Development](https://github.com/mkruglikov/droidjev/blob/master/docs/development.md)** —
   running from a checkout, tests, lint.
 

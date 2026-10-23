@@ -1,16 +1,16 @@
 ---
 name: droidjev
-description: Fast Android emulator UI automation without screenshots. Turns a natural-language goal into real taps on an Android emulator/AVD using the view hierarchy and the Typesafe jev model — open Settings, toggle a switch, scroll a list, type into a field. Also provides deterministic primitives: find a label in any scrollable list, launch an app by package. Use whenever the user asks to open, click, tap, press, toggle, navigate to, scroll, search, or otherwise interact with anything on an Android emulator, AVD, or virtual device — even if they never say "click" (e.g. "open screen settings on emulator", "turn off wifi on the emulator", "go to About phone").
+description: Fast Android emulator UI automation, view-hierarchy first. Turns a natural-language goal into real taps on an Android emulator/AVD using the Typesafe jev model — open Settings, toggle a switch, scroll a list, type into a field; screens without accessibility nodes fall back to screenshot+box answers. Also provides deterministic primitives: find a label in any scrollable list, launch an app by package. Use whenever the user asks to open, click, tap, press, toggle, navigate to, scroll, search, or otherwise interact with anything on an Android emulator, AVD, or virtual device — even if they never say "click" (e.g. "open screen settings on emulator", "turn off wifi on the emulator", "go to About phone").
 ---
 
 # droidjev
 
 DroidJev (`droidjev`) acts on an Android emulator from a natural-language goal.
-It dumps the view hierarchy (never screenshots), asks the Typesafe jev model
-which indexed element advances the goal, taps it via adb, and verifies the
-screen changed — all in one CLI invocation. A typical 2-step goal finishes in
-~6s. A powered-off emulator is fine: it auto-boots the first AVD (adds
-~30–60s).
+It dumps the view hierarchy (screenshots only when a screen exposes no
+accessibility nodes), asks the Typesafe jev model which indexed element
+advances the goal, taps it via adb, and verifies the screen changed — all in
+one CLI invocation. A typical 2-step goal finishes in ~6s. A powered-off
+emulator is fine: it auto-boots the first AVD (adds ~30–60s).
 
 **How to invoke:** run the `droidjev` binary from the repo if it is on PATH
 (`droidjev …`), otherwise `node <repo>/droidjev …` with the DroidJev
@@ -74,6 +74,7 @@ missing android CLI where needed, missing TYPESAFE_API_KEY, no AVD).
 | `--max-steps N` | action budget for act (default 12) |
 | `--max-iterations N` | (find) scroll budget (default 20) |
 | `--no-animations` | disable device animations for the run (restored after; steps verify sooner) |
+| `--no-vision` | never send screenshots: a screen without accessibility nodes blocks (blind_screen) instead of falling back to image+box answers |
 | `--tap` | (find) tap the best match instead of just reporting it |
 | `--grep "…"` | (snapshot) print only rows containing the substring |
 | `--json` | full machine-readable trace |
@@ -87,8 +88,10 @@ will not type a wrong value into the field).
 ## When it blocks
 
 - `blockedReason=blind_screen` or an empty element list: the screen exposes no
-  accessibility nodes (WebView or exotic renderer). Fall back to the
-  android-cli screenshot flow (skill `android-cli`, reference `interact.md`).
+  accessibility nodes (WebView or exotic renderer) AND the vision fallback
+  could not run (unreadable screenshot, `--no-vision`). With vision on (the
+  default), droidjev already drives such screens itself by screenshot — do not
+  re-route them by hand unless it blocks here.
 - `blockedReason=model`: the model judged the goal unreachable with the
   available actions (missing app, permission wall, login required, or the goal
   names a value that was not passed via `--text` — rerun with it). Use

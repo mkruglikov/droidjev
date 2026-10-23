@@ -1,6 +1,7 @@
 // Executor: turns a validated decision into adb input. All taps come from
-// coordinates computed in code from our own element table — the model never
-// produces coordinates, selectors, or commands.
+// coordinates computed in code — from our element table, or in the vision
+// fallback (agent.js) from a strictly validated box of 0-1 fractions. The
+// model never produces raw coordinates, selectors, or commands.
 import { shellOk } from './adb.js';
 import { DroidJevError } from './util.js';
 

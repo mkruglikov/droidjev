@@ -6,7 +6,10 @@
 import { DroidJevError, redact, sleep, run } from './util.js';
 
 const API_URL = 'https://api.typesafe.ai/v1/systemone';
-const MODEL = 'jev-latest';
+// Pinned, not jev-latest: the box primitive and image assets are 1.14-only
+// (jev-latest still resolves to 1.13.0 at the time of writing), and 1.14's
+// multilingual gains feed the cross-locale matching the prompts rely on.
+const MODEL = 'jev-1.14.0';
 const RETRY_STATUS = new Set([429, 529, 503]);
 const MAX_ATTEMPTS = 3;
 
@@ -94,10 +97,12 @@ export function prewarm() {
   return fetch(API_URL, { method: 'HEAD' }).catch(() => {});
 }
 
-// One request with N parallel questions. Returns {answers, usage, latencyMs}.
-export async function ask({ state, questions, timeoutMs = 20000 }) {
+// One request with N parallel questions. `assets` carries image assets; any
+// such request must send the danger-zone images header (400 otherwise).
+// Returns {answers, usage, latencyMs}.
+export async function ask({ state, questions, assets = null, timeoutMs = 20000 }) {
   const key = await requireApiKey();
-  const body = JSON.stringify({ model: MODEL, state, questions });
+  const body = JSON.stringify({ model: MODEL, state, questions, ...(assets && { assets }) });
   let lastErr = null;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     if (attempt > 0) await sleep(500 * 2 ** (attempt - 1));
@@ -110,7 +115,11 @@ export async function ask({ state, questions, timeoutMs = 20000 }) {
       try {
         res = await fetch(API_URL, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+          headers: {
+            Authorization: `Bearer ${key}`,
+            'Content-Type': 'application/json',
+            ...(assets && { 'TypeSafe-Danger-Zone-Images': 'true' }),
+          },
           body,
           signal: ctrl.signal,
         });
@@ -188,4 +197,25 @@ export function validatedNoul(answer, questionId) {
   const n = answer.noul;
   if (!Number.isFinite(n) || n < 0 || n > 1) throw bad(`noul ${n} out of range`);
   return { noul: n };
+}
+
+// The one place the model may name a position: a box answer's edges are
+// fractions of the image, validated here to a proper in-bounds rectangle
+// before code converts them to a tap point. A box answer is returned even
+// when the target is absent — the caller's noul gate decides that, not this.
+// The API schema allows confidence: null (model offered none).
+export function validatedBox(answer, questionId) {
+  const bad = (why) => new DroidJevError(`invalid typesafe answer for "${questionId}" (${why}); no action executed`);
+  if (!answer || typeof answer !== 'object') throw bad('missing answer');
+  const { box } = answer;
+  if (!box || typeof box !== 'object') throw bad('missing box');
+  for (const [edge, v] of Object.entries({ top: box.top, bottom: box.bottom, left: box.left, right: box.right })) {
+    if (!Number.isFinite(v) || v < 0 || v > 1) throw bad(`edge ${edge}=${String(v)} out of range`);
+  }
+  if (!(box.left < box.right) || !(box.top < box.bottom)) throw bad('edges do not form a rectangle');
+  const conf = answer.confidence;
+  if (conf !== null && conf !== undefined && (!Number.isFinite(conf) || conf < 0 || conf > 1)) {
+    throw bad(`confidence ${String(conf)} out of range`);
+  }
+  return { box: { top: box.top, bottom: box.bottom, left: box.left, right: box.right }, confidence: conf ?? null };
 }

@@ -21,7 +21,8 @@ import {
 } from './elements.js';
 import { screenSize, shell } from './adb.js';
 import { startApp } from './start.js';
-import { ask, prewarm, validatedChoice, validatedNoul } from './typesafe.js';
+import { screenshotPng } from './shot.js';
+import { ask, prewarm, validatedChoice, validatedNoul, validatedBox } from './typesafe.js';
 import {
   tap,
   longPress,
@@ -34,6 +35,7 @@ import {
   KEYS,
 } from './act.js';
 import { DroidJevError, sleep } from './util.js';
+import { randomUUID } from 'node:crypto';
 
 const MAX_ROWS_NOTE = 'the row cap';
 // Mirrors the --text ceiling (act.js sanitizeInputText): the clipboard must
@@ -418,6 +420,243 @@ export async function askDecision({ state, questions, askFn = ask, log = () => {
   };
 }
 
+// --- vision fallback (jev 1.14: images + the box primitive) ---
+//
+// Runs only when the element table is EMPTY — a screen that exposes no
+// accessibility nodes (WebView content, canvas renderers), which otherwise
+// ends the run as blocked:blind_screen on arrival. One request asks three
+// parallel questions against a screenshot: the operation stays a validated
+// choice among host-executable ops, a noul gates the whole step (a box answer
+// comes back even when nothing is visible), and the box — the one place the
+// model names a position — is strictly validated fractions, never raw
+// coordinates, resolved to a tap point in code.
+
+// Box answers below this confidence are not tapped. The docs give no
+// recommended threshold; 0.6 is their worked example.
+// ponytail: untuned — tune on real blind screens if it withholds good taps.
+export const TAP_BOX_MIN_CONFIDENCE = 0.6;
+
+export function buildVisionQuestions(ref) {
+  return {
+    operation: {
+      type: 'choice',
+      instructions: {
+        question:
+          'The element list is empty: this screen exposes no accessibility nodes (a web page or custom renderer), so the screenshot in state.screenshot is the only view of it. Pick the single next action that best advances the goal.',
+        rules: [
+          'tap_box taps the on-screen element the tap_target answer marks — a link, a button, a field, an image acting as a control. Judge by what is VISIBLE in the screenshot, matching the goal by meaning (the goal and the page may be in different languages).',
+          'scroll_down/scroll_up move the page when the target is probably just out of view; back leaves this page for the one before it; home returns to the launcher, whose element list is readable again.',
+          'Choose done only when the screenshot itself shows the goal achieved.',
+          'Choose blocked only when nothing on this screen can lead to the goal.',
+        ],
+      },
+      criteria: {
+        tap_box: 'Tap the element the tap_target box marks — the visible control that best advances the goal',
+        scroll_down: 'Scroll down — the target is probably further down the page',
+        scroll_up: 'Scroll up — the target is probably higher on the page',
+        back: 'Leave this page for the one before it',
+        home: 'Return to the home screen',
+        wait: 'The page is still loading; act next step',
+        done: 'The goal is already achieved, as shown in the screenshot',
+        blocked: 'No action on this screen can achieve the goal',
+      },
+    },
+    screen_readable: {
+      type: 'noul',
+      instructions: `Does the screenshot in state.screenshot show a rendered screen with content (text, controls, images) rather than a blank, black or off display?`,
+    },
+    // The reference (not a state path) grounds the box precisely; it is the
+    // second and last copy of the image in the request.
+    tap_target: {
+      type: 'box',
+      instructions: `The single element in \`${ref}\` to tap next to advance the goal (this answer is used only when the operation choice is tap_box)`,
+    },
+  };
+}
+
+// Consume the three parallel answers: the noul gates, the choice directs,
+// the box targets. Pure.
+export function visionVerdict({ operation, screenReadable, tapTarget }) {
+  if (screenReadable.noul < 0.5) return { kind: 'blocked', reason: 'blind_screen' };
+  if (operation.choice === 'tap_box') {
+    return tapTarget.confidence === null || tapTarget.confidence >= TAP_BOX_MIN_CONFIDENCE
+      ? { kind: 'tap', box: tapTarget.box, confidence: operation.confidence }
+      : { kind: 'skip_tap', confidence: tapTarget.confidence };
+  }
+  return { kind: 'op', choice: operation.choice, confidence: operation.confidence };
+}
+
+// Box fractions → a tap point in screen pixels. The screenshot is the full
+// screen, so a fraction of the image is a fraction of the screen (±1px from
+// downscale rounding).
+export function boxCenter(box, screen) {
+  const w = screen?.w ?? 1080;
+  const h = screen?.h ?? 2340;
+  return {
+    x: Math.round(((box.left + box.right) / 2) * w),
+    y: Math.round(((box.top + box.bottom) / 2) * h),
+  };
+}
+
+// One blind-screen step. Returns {status, blockedReason?, record, table?,
+// rootPkg?, hash?}: table/rootPkg/hash are the post-settle state when a
+// gesture ran, null when the screen was not touched. On an untappable
+// screenshot pipeline the run degrades to the old blocked:blind_screen
+// instead of erroring — vision is a fallback, not a prerequisite.
+async function visionStep({
+  serial,
+  step,
+  goal,
+  values,
+  screen,
+  appPkg,
+  steps,
+  deviceDate,
+  pacing,
+  animationsOff,
+  prevHash,
+  log,
+  askFn = ask,
+}) {
+  let shot;
+  try {
+    shot = await screenshotPng(serial);
+  } catch (e) {
+    log(`step ${step}: vision fallback unavailable (${e.message})`);
+    return {
+      status: 'blocked',
+      blockedReason: 'blind_screen',
+      record: {
+        step,
+        choice: 'blocked',
+        action: 'blocked (screenshot capture failed on a blind screen)',
+        changed: null,
+        apiMs: 0,
+      },
+    };
+  }
+  // A UUID reference cannot collide with goal or row text (docs: references
+  // are find-and-replaced as plain substrings).
+  const ref = randomUUID();
+  const state = {
+    goal,
+    provided_texts: values.length ? values : null,
+    today: deviceDate,
+    screen: { app: appPkg, size: screen ? `${screen.w}x${screen.h}` : null },
+    elements: [],
+    elements_note:
+      'the element list is empty: this screen exposes no accessibility nodes (a web page or custom renderer) — the screenshot is the screen',
+    screenshot: ref,
+    recent_actions: steps
+      .slice(-10)
+      .map((s) => `${s.step}. ${s.action}${s.changed === false ? ' (no visible change)' : ''}`),
+  };
+  const questions = buildVisionQuestions(ref);
+  const res = await askFn({
+    state,
+    questions,
+    assets: { [ref]: { type: 'image', format: 'png', data_base64: shot.png.toString('base64') } },
+    // ~1MB body + image tokens: visibly slower than the text requests the
+    // 20s default was tuned for.
+    timeoutMs: 45000,
+  });
+  const apiMs = res.latencyMs ?? 0;
+  const operation = validatedChoice(res.answers.operation, Object.keys(questions.operation.criteria), 'operation');
+  const screenReadable = validatedNoul(res.answers.screen_readable, 'screen_readable');
+  const tapTarget = validatedBox(res.answers.tap_target, 'tap_target');
+  const verdict = visionVerdict({ operation, screenReadable, tapTarget });
+
+  if (verdict.kind === 'blocked') {
+    return {
+      status: 'blocked',
+      blockedReason: verdict.reason,
+      record: {
+        step,
+        choice: 'blocked',
+        action: `blocked (vision, screen_readable=${screenReadable.noul.toFixed(2)})`,
+        changed: null,
+        apiMs,
+      },
+    };
+  }
+  if (verdict.kind === 'op' && (verdict.choice === 'done' || verdict.choice === 'blocked')) {
+    return {
+      status: verdict.choice,
+      blockedReason: verdict.choice === 'blocked' ? 'model' : null,
+      record: {
+        step,
+        choice: verdict.choice,
+        action: `${verdict.choice} (vision, conf=${operation.confidence.toFixed(2)})`,
+        changed: null,
+        apiMs,
+      },
+    };
+  }
+  const choice = verdict.kind === 'tap' ? 'tap_box' : verdict.choice;
+  const stepT0 = performance.now();
+  let action;
+  if (verdict.kind === 'tap') {
+    const c = boxCenter(verdict.box, screen);
+    log(`step ${step}: vision tap ${c.x},${c.y} (conf ${operation.confidence.toFixed(2)})`);
+    await tap(serial, c);
+    action = `tap (by screenshot) ${c.x},${c.y}`;
+  } else if (verdict.kind === 'skip_tap') {
+    log(`step ${step}: vision tap withheld (box confidence ${verdict.confidence.toFixed(2)})`);
+    return {
+      status: null,
+      record: {
+        step,
+        choice,
+        action: `tap withheld (box confidence ${verdict.confidence.toFixed(2)})`,
+        changed: false,
+        apiMs,
+      },
+      table: null,
+      rootPkg: null,
+      hash: null,
+    };
+  } else if (choice === 'scroll_down' || choice === 'scroll_up') {
+    const dir = choice.slice('scroll_'.length);
+    pacing.sameDirRun = dir === pacing.lastScrollDir ? pacing.sameDirRun + 1 : 0;
+    pacing.lastScrollDir = dir;
+    const h = screen?.h ?? 2340;
+    const anchor = { x: Math.round((screen?.w ?? 1080) / 2), y: Math.round(h / 2) };
+    const dy = scrollDistance(h, pacing.sameDirRun);
+    await scrollSwipe(serial, anchor, dy, h, dir);
+    log(`step ${step}: ${choice} by screenshot (${Math.round((dy / h) * 100)}% of screen)`);
+    action = `${choice} (by screenshot)`;
+  } else if (choice === 'back' || choice === 'home') {
+    await keyevent(serial, choice === 'back' ? KEYS.back : KEYS.home);
+    pacing.lastScrollDir = null;
+    action = choice;
+  } else if (choice === 'wait') {
+    await sleep(700);
+    action = 'wait';
+  } else {
+    throw new DroidJevError(`unhandled vision operation ${choice}`);
+  }
+  // Same settle contract as a normal step; the settled dump is verification
+  // and the next table. ponytail: tableHash cannot tell two different blind
+  // screens apart (both hash the empty list) — the action log is the history.
+  const settleMs = choice.startsWith('scroll_') ? (animationsOff ? 150 : 250) : animationsOff ? 400 : 600;
+  const next = await settleLayout(serial, { maxMs: settleMs });
+  const nextTable = buildTable(next.elements, screen);
+  return {
+    status: null,
+    record: {
+      step,
+      choice,
+      action,
+      changed: tableHash(nextTable) !== prevHash,
+      apiMs,
+      actMs: performance.now() - stepT0,
+    },
+    table: nextTable,
+    rootPkg: next.rootPkg,
+    hash: tableHash(nextTable),
+  };
+}
+
 // The device's own date: a goal about "tomorrow" is only decidable against
 // it, and the emulator's clock is not the host's.
 async function deviceToday(serial) {
@@ -438,6 +677,7 @@ export async function runGoal({
   maxSteps = 12,
   animationsOff = false,
   answers = false,
+  vision = true,
   log = () => {},
 }) {
   if (!goal || typeof goal !== 'string')
@@ -462,8 +702,9 @@ export async function runGoal({
 
   let table = buildTable(elements, screen);
   // Retry once on an empty dump: entry animations can momentarily hide nodes.
-  // ponytail: one retry, 900ms — a hard ceiling for blind screens (WebView),
-  // which the skill routes to the android-cli screenshot flow instead.
+  // Still empty afterwards → the per-step vision fallback takes over (or, with
+  // vision off, the model sees an empty list and blocks with blind_screen).
+  // ponytail: one retry, 900ms.
   if (table.length === 0) {
     await sleep(900);
     const retry = await getLayout(serial);
@@ -473,14 +714,48 @@ export async function runGoal({
   let prevHash = tableHash(table);
   const steps = [];
   let copied = false; // a copy_<idx> step ran this run — gates the paste op
-  let sameDirRun = 0; // consecutive same-direction scrolls; paces scroll length only
-  let lastScrollDir = null;
+  // Consecutive same-direction scrolls pace the distance; a reversal resets
+  // it. An object (not two lets) so the vision step can share the state.
+  const pacing = { sameDirRun: 0, lastScrollDir: null };
   let status = 'max_steps';
   let blockedReason = null;
 
   for (let step = 1; step <= maxSteps; step++) {
     const appPkg = rootPkg ?? 'unknown';
     const launcher = /launcher/i.test(appPkg);
+    // A blind screen (empty table) goes to the vision fallback: the
+    // screenshot becomes the screen. Without it (or --no-vision) the run
+    // keeps the old behavior — the model sees an empty list and blocks.
+    if (vision && table.length === 0) {
+      const v = await visionStep({
+        serial,
+        step,
+        goal,
+        values,
+        screen,
+        appPkg,
+        steps,
+        deviceDate,
+        pacing,
+        animationsOff,
+        prevHash,
+        log,
+      });
+      if (v.status === 'done' || v.status === 'blocked') {
+        if (v.status === 'blocked') blockedReason = v.blockedReason;
+        status = v.status;
+        steps.push(v.record);
+        break;
+      }
+      steps.push(v.record);
+      if (v.table) {
+        table = v.table;
+        rootPkg = v.rootPkg;
+        prevHash = v.hash;
+      }
+      if (v.record.changed !== null) log(`        → ${v.record.changed ? 'screen changed' : 'no visible change'}`);
+      continue;
+    }
     const state = {
       goal,
       provided_texts: values.length ? values : null,
@@ -689,27 +964,27 @@ export async function runGoal({
       const dir = op.choice.slice('scroll_'.length);
       // Consecutive same-direction scrolls pace the distance (long lists);
       // a reversal resets the pacing.
-      sameDirRun = dir === lastScrollDir ? sameDirRun + 1 : 0;
-      lastScrollDir = dir;
+      pacing.sameDirRun = dir === pacing.lastScrollDir ? pacing.sameDirRun + 1 : 0;
+      pacing.lastScrollDir = dir;
       const vertical = dir === 'down' || dir === 'up';
       if (vertical) {
         const anchor = scrollAnchor(table, screen || { w: 1080, h: 2340 });
-        const dy = scrollDistance(screen?.h ?? 2340, sameDirRun);
+        const dy = scrollDistance(screen?.h ?? 2340, pacing.sameDirRun);
         await scrollSwipe(serial, anchor, dy, screen?.h ?? 2340, dir);
         log(`step ${step}: ${op.choice} (${Math.round((dy / (screen?.h ?? 2340)) * 100)}% of screen)`);
       } else {
         const w = screen?.w ?? 1080;
         const anchor = horizontalAnchor(table, screen) ?? scrollAnchor(table, screen || { w, h: 2340 });
-        const dx = scrollDistance(w, sameDirRun);
+        const dx = scrollDistance(w, pacing.sameDirRun);
         await scrollSwipeX(serial, anchor, dx, w, dir);
         log(`step ${step}: ${op.choice} (${Math.round((dx / w) * 100)}% of screen)`);
       }
     } else if (op.choice === 'back') {
       await keyevent(serial, KEYS.back);
-      lastScrollDir = null;
+      pacing.lastScrollDir = null;
     } else if (op.choice === 'home') {
       await keyevent(serial, KEYS.home);
-      lastScrollDir = null;
+      pacing.lastScrollDir = null;
     } else if (op.choice === 'paste') {
       // Fail closed even though buildQuestions no longer offers paste without
       // a prior copy: validation only proves the choice was a legal member of

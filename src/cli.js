@@ -19,7 +19,8 @@ const VERSION = JSON.parse(
   readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'),
 ).version;
 
-const USAGE = `droidjev ${VERSION} — fast jev-powered Android emulator clicker (no screenshots)
+const USAGE = `droidjev ${VERSION} — fast jev-powered Android emulator clicker (text-first;
+a screenshot is sent to the model only when a screen exposes no accessibility nodes)
 
 usage: droidjev <command> [args] [flags]
 
@@ -57,6 +58,9 @@ flags:
   --answer                   (act) the goal is a question: offer the answer_ options
                              and report the submitted answer instead of stopping at
                              done
+  --no-vision                (act) never send screenshots: a screen with no
+                             accessibility nodes blocks (blind_screen) instead of
+                             falling back to image+box answers
   --grep "..."               (snapshot) print only rows containing the substring
   --json                     machine-readable output
   --no-animations            disable window/transition animations for the run
@@ -113,6 +117,7 @@ export function parseArgs(argv) {
     else if (a === '--serve') flags.serve = true;
     else if (a === '--tap') flags.tap = true;
     else if (a === '--answer') flags.answer = true;
+    else if (a === '--no-vision') flags.noVision = true;
     else if (a === '--no-animations') flags.noAnimations = true;
     else if (a === '--help' || a === '-h') flags.help = true;
     else if (a.startsWith('--')) throw new DroidJevError(`unknown flag: ${a}`);
@@ -252,6 +257,7 @@ async function cmdAct(flags) {
       maxSteps: flags.maxSteps || 12,
       animationsOff: !!flags.noAnimations,
       answers: !!flags.answer,
+      vision: !flags.noVision,
       log: (m) => console.error(`# ${m}`),
     });
   const res = await withUia2(serial, () => (flags.noAnimations ? withAnimationsOff(serial, runIt) : runIt()));
