@@ -384,6 +384,15 @@ export function stuckOps(recentChoices = [], lastUnchanged = null) {
     stuck.add(a);
     stuck.add(b);
   }
+  // A three-step cycle — open, act, retreat (`launch_0, click_1, back`) —
+  // repeats just as blindly as a two-step one. Two full turns of the pattern,
+  // all distinct, is not how any goal is advanced.
+  if (ops.length >= 6) {
+    const cycle = ops.slice(-3);
+    if (new Set(cycle).size === 3 && ops.slice(-6, -3).every((o, i) => o === cycle[i])) {
+      for (const op of cycle) stuck.add(op);
+    }
+  }
   const last = ops.at(-1);
   if (last && !last.startsWith('scroll_') && ops.slice(-3).every((o) => o === last)) stuck.add(last);
   // Waiting twice is idle time, not patience: the host already waits for the

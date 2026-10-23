@@ -1,11 +1,42 @@
 // Ensure a booted emulator exists: resolve --device (serial or AVD name),
 // auto-boot the first AVD when nothing is online. The `android` CLI is fine
 // here (cold path); the per-step hot loop stays adb-only.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { run, sleep, DroidJevError, redact } from './util.js';
 import { adbDevices, avdName, isEmulatorSerial, shell, bootCompleted } from './adb.js';
 
 const ANDROID = 'android';
 const BOOT_TIMEOUT_MS = 240_000;
+
+// An AVD with `hw.gpu.enabled = no` renders on the CPU: a visible emulator
+// then burns a whole core redrawing every frame and starves everything else
+// on the host. The `android` CLI takes no -gpu passthrough, so the AVD's own
+// config.ini is the only lever. Pure text-in/text-out so it stays testable.
+export function pinHostGpuIni(text) {
+  const enabled = /^hw\.gpu\.enabled\s*=.*$/m;
+  const mode = /^hw\.gpu\.mode\s*=.*$/m;
+  let out = text;
+  out = enabled.test(out) ? out.replace(enabled, 'hw.gpu.enabled = yes') : `${out.trimEnd()}\nhw.gpu.enabled = yes\n`;
+  out = mode.test(out) ? out.replace(mode, 'hw.gpu.mode = host') : `${out.trimEnd()}\nhw.gpu.mode = host\n`;
+  return out;
+}
+
+function pinHostGpu(avd, notices) {
+  const ini = path.join(os.homedir(), '.android', 'avd', `${avd}.avd`, 'config.ini');
+  let text;
+  try {
+    text = fs.readFileSync(ini, 'utf8');
+  } catch {
+    return; // no config to patch; the boot itself will surface any problem
+  }
+  const pinned = pinHostGpuIni(text);
+  if (pinned !== text) {
+    fs.writeFileSync(ini, pinned);
+    notices?.push(`${avd}: pinned hw.gpu.mode=host in config.ini (software rendering starves the host CPU)`);
+  }
+}
 
 export async function listAvds() {
   const r = await run(ANDROID, ['emulator', 'list'], { timeoutMs: 20000 });
@@ -106,6 +137,7 @@ async function bootAvd(avd, notices) {
   }
 
   notices?.push(`booting AVD ${avd} (android emulator start; this can take ~30-60s)`);
+  pinHostGpu(avd, notices);
   const preSerials = new Set((await adbDevices()).map((d) => d.serial));
   const r = await run(ANDROID, ['emulator', 'start', avd], { timeoutMs: BOOT_TIMEOUT_MS });
   if (r.code !== 0) {

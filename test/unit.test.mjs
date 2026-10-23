@@ -18,6 +18,7 @@ import { sanitizeInputText, slideGesture } from '../src/act.js';
 import { redact } from '../src/util.js';
 import { parseArgs, parseApp } from '../src/cli.js';
 import { matchRows } from '../src/find.js';
+import { pinHostGpuIni } from '../src/boot.js';
 import { parseResolveActivity } from '../src/start.js';
 import {
   scrollDistance,
@@ -279,6 +280,18 @@ test('stuckOps withdraws a second wait and a scroll that changed nothing', () =>
   assert.ok(stuckOps(['scroll_down'], 'scroll_down').has('scroll_down'), 'a scroll that moved nothing is withdrawn');
   assert.ok(!stuckOps(['scroll_down']).has('scroll_down'), 'a scroll that moved something stays');
   assert.ok(!stuckOps(['click_1'], 'click_2').has('click_2'), 'only scrolls are withdrawn on no-change');
+});
+
+test('stuckOps withdraws the three ops of a repeated three-step cycle', () => {
+  const cycle = ['launch_0', 'click_1', 'back', 'launch_0', 'click_1', 'back'];
+  const stuck = stuckOps(cycle);
+  for (const op of ['launch_0', 'click_1', 'back']) {
+    assert.ok(stuck.has(op), `a twice-turned open-act-retreat cycle withdraws ${op}`);
+  }
+  const varied = stuckOps(['launch_0', 'click_1', 'back', 'click_2', 'launch_0', 'click_1']);
+  assert.equal(varied.size, 0, 'different trailing steps are walking, not cycling');
+  const once = stuckOps(['home', 'launch_0', 'click_1', 'back']);
+  assert.equal(once.size, 0, 'one turn of the pattern is not a loop');
 });
 
 test('buildQuestions drops the options a stuck loop or an idle step rules out', () => {
@@ -1164,4 +1177,22 @@ test('boxCenter maps fractions to an integer screen point', () => {
   });
   const c = boxCenter({ left: 0.2, right: 0.3, top: 0.7, bottom: 0.71 }, { w: 1080, h: 2340 });
   assert.ok(Number.isInteger(c.x) && Number.isInteger(c.y));
+});
+
+test('pinHostGpuIni forces host GPU over a disabled or absent setting', () => {
+  assert.equal(
+    pinHostGpuIni('hw.gpu.enabled = no\nhw.gpu.mode = auto\n'),
+    'hw.gpu.enabled = yes\nhw.gpu.mode = host\n',
+    'disabled GPU is repinned to host',
+  );
+  assert.equal(
+    pinHostGpuIni('avd.ini.encoding = UTF-8\n'),
+    'avd.ini.encoding = UTF-8\nhw.gpu.enabled = yes\nhw.gpu.mode = host\n',
+    'missing GPU keys are appended',
+  );
+  assert.equal(
+    pinHostGpuIni('hw.gpu.enabled = yes\nhw.gpu.mode = host\n'),
+    'hw.gpu.enabled = yes\nhw.gpu.mode = host\n',
+    'an already-pinned config is left byte-identical',
+  );
 });
