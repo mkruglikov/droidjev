@@ -1,14 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseUia2Xml } from '../src/layout.js';
-import { buildTable, tableHash, scrollAnchor } from '../src/elements.js';
+import {
+  buildTable,
+  tableHash,
+  scrollAnchor,
+  serializeRows,
+  listItems,
+  elementText,
+  isDateLabel,
+} from '../src/elements.js';
 import { validatedChoice, validatedNoul } from '../src/typesafe.js';
-import { sanitizeInputText } from '../src/act.js';
+import { sanitizeInputText, slideGesture } from '../src/act.js';
 import { redact } from '../src/util.js';
-import { parseArgs } from '../src/cli.js';
+import { parseArgs, parseApp } from '../src/cli.js';
 import { matchRows } from '../src/find.js';
 import { parseResolveActivity } from '../src/start.js';
-import { scrollDistance, buildQuestions, scrollOffered, pasteOutcome } from '../src/agent.js';
+import {
+  scrollDistance,
+  buildQuestions,
+  scrollOffered,
+  pasteOutcome,
+  sliderStops,
+  answerFor,
+  stuckOps,
+} from '../src/agent.js';
+import { buildDecideRequest, decide, serveDecide } from '../src/decide.js';
 
 const mkRow = (idx, row, clickable) => ({
   idx,
@@ -72,6 +89,9 @@ test('buildQuestions merges element choices into the operation question', () => 
     !noScrollKeys.some((k) => k.startsWith('scroll_')),
     `no scroll options without a usable scrollable: ${noScrollKeys}`,
   );
+  const launcherKeys = Object.keys(buildQuestions({ goal: 'g', table, launcher: true }).operation.criteria);
+  assert.ok(!launcherKeys.includes('blocked'), `no blocked offered from the launcher: ${launcherKeys}`);
+  assert.ok(launcherKeys.includes('done'), 'done stays available on the launcher');
   assert.ok(
     ['done', 'blocked', 'back'].every((k) => noScrollKeys.includes(k)),
     'fixed ops survive scroll removal',
@@ -244,6 +264,22 @@ test('operation rules cover untypable goal text and no-change repeats', () => {
   assert.ok(joined.includes('no visible change'), 'no-repeat-on-no-change guidance');
   assert.ok(joined.includes('would duplicate it'), 'paste-into-already-filled field → done guidance');
   assert.ok(joined.includes('do not enter it again'), 'abandoned-section guidance');
+});
+
+test('stuckOps withdraws a second wait and a scroll that changed nothing', () => {
+  assert.ok(stuckOps(['click_1', 'wait']).has('wait'), 'a wait after a wait is idle time');
+  assert.ok(!stuckOps(['click_1']).has('wait'), 'the first wait stays available');
+  assert.ok(stuckOps(['scroll_down'], 'scroll_down').has('scroll_down'), 'a scroll that moved nothing is withdrawn');
+  assert.ok(!stuckOps(['scroll_down']).has('scroll_down'), 'a scroll that moved something stays');
+  assert.ok(!stuckOps(['click_1'], 'click_2').has('click_2'), 'only scrolls are withdrawn on no-change');
+});
+
+test('buildQuestions drops the options a stuck loop or an idle step rules out', () => {
+  const table = buildTable(parseUia2Xml(SAMPLE_XML), SCREEN);
+  const idle = buildQuestions({ table, texts: [], recentChoices: ['wait'], lastUnchanged: null });
+  const fresh = buildQuestions({ table, texts: [], recentChoices: [], lastUnchanged: null });
+  assert.ok(!('wait' in idle.operation.criteria), 'wait is gone once a wait changed nothing');
+  assert.ok('wait' in fresh.operation.criteria, 'wait is offered while it is still useful');
 });
 
 test('tableHash ignores position-only shifts, detects content/state changes', () => {
@@ -476,4 +512,490 @@ test('sanitizeInputText maps spaces and rejects shell metacharacters', () => {
   ]) {
     assert.throws(() => sanitizeInputText(evil), /cannot be typed safely|empty/i, `must reject: ${evil}`);
   }
+});
+
+// --- decide: the host-facing single step -----------------------------------
+
+const decideElements = () => [
+  {
+    pkg: 'com.android.settings',
+    class: 'android.widget.TextView',
+    text: 'Wi-Fi',
+    bounds: { l: 0, t: 100, r: 500, b: 200 },
+    center: { x: 250, y: 150 },
+    clickable: true,
+  },
+  {
+    pkg: 'com.android.settings',
+    class: 'android.widget.Switch',
+    checkable: true,
+    checked: true,
+    clickable: true,
+    bounds: { l: 800, t: 120, r: 1000, b: 180 },
+    center: { x: 900, y: 150 },
+  },
+  {
+    pkg: 'com.android.settings',
+    class: 'android.widget.EditText',
+    hint: 'Search',
+    bounds: { l: 0, t: 300, r: 1000, b: 400 },
+    center: { x: 500, y: 350 },
+  },
+  {
+    pkg: 'com.android.settings',
+    class: 'android.widget.TextView',
+    text: '15',
+    bounds: { l: 0, t: 500, r: 200, b: 600 },
+    center: { x: 100, y: 550 },
+  },
+];
+
+const decideRequest = (over = {}) => ({
+  goal: 'turn Wi-Fi off',
+  screen: { app: 'com.android.settings', size: '1080x2400', w: 1080, h: 2400 },
+  elements: decideElements(),
+  provided_texts: ['hello', 'world'],
+  can_scroll: false,
+  clipboard: false,
+  ...over,
+});
+
+test('buildDecideRequest offers the act-loop operations for a host table', () => {
+  const { state, questions } = buildDecideRequest(decideRequest());
+  const keys = Object.keys(questions.operation.criteria);
+  assert.ok(keys.includes('click_0'), 'clickable labeled row is offered');
+  assert.ok(
+    keys.includes('type_2_0') && keys.includes('type_2_1'),
+    'each provided text gets a type option on editable rows',
+  );
+  assert.deepEqual(
+    keys.filter((k) => ['back', 'home', 'wait', 'done', 'blocked'].includes(k)).sort(),
+    ['back', 'blocked', 'done', 'home', 'wait'],
+    'fixed operations are always offered',
+  );
+  assert.ok(!keys.includes('scroll_down'), 'scroll is withheld when can_scroll is false');
+  assert.ok(!keys.some((k) => k.startsWith('copy_') || k === 'paste'), 'no clipboard ops when the host cannot copy');
+  assert.deepEqual(
+    state.elements,
+    serializeRows(buildTable(decideElements(), { w: 1080, h: 2400 })),
+    'state carries the serialized rows',
+  );
+  assert.equal(state.provided_texts.length, 2);
+  assert.equal(state.screen.app, 'com.android.settings');
+  assert.equal(state.elements_note, null);
+});
+
+test('buildDecideRequest keeps clipboard ops, screen notes and history bounded', () => {
+  const { state, questions } = buildDecideRequest(
+    decideRequest({
+      clipboard: true,
+      copied: true,
+      can_scroll: true,
+      screen: { app: 'com.android.launcher3', size: '1080x2400', w: 1080, h: 2400 },
+      recent_actions: Array.from({ length: 14 }, (_, i) => `${i}. click_${i}`),
+    }),
+  );
+  const keys = Object.keys(questions.operation.criteria);
+  assert.ok(keys.includes('copy_3'), 'a row with text can be copied');
+  assert.ok(keys.includes('paste'), 'paste appears once a copy ran');
+  assert.ok(keys.includes('scroll_down') && keys.includes('scroll_up'), 'scroll offered when the host allows it');
+  assert.match(state.elements_note, /home screen \(launcher\)/);
+  assert.equal(state.recent_actions.length, 10, 'only the last 10 actions are sent');
+  assert.equal(state.recent_actions[9], '13. click_13');
+});
+
+test('decide validates the answer against the offered options', async () => {
+  const { questions } = buildDecideRequest(decideRequest());
+  const ids = Object.keys(questions.operation.criteria);
+  const answers = (choice, probabilities) => ({ operation: { choice, probabilities }, goal_met: { noul: 0.2 } });
+  const all = Object.fromEntries(ids.map((k) => [k, 0]));
+  all.click_0 = 1;
+
+  const res = await decide(decideRequest(), {
+    askFn: async () => ({ answers: answers('click_0', all), usage: { input_tokens: 5 }, latencyMs: 7 }),
+  });
+  assert.equal(res.operation.choice, 'click_0');
+  assert.equal(res.operation.confidence, 1);
+  assert.equal(res.goal_met.noul, 0.2);
+  assert.equal(res.app, 'com.android.settings');
+  assert.equal(res.usage.input_tokens, 5);
+
+  // Probabilities that do not cover exactly the offered options, or a choice
+  // that is not the argmax, must never become an action.
+  const missing = { ...all };
+  delete missing.wait;
+  await assert.rejects(
+    () => decide(decideRequest(), { askFn: async () => ({ answers: answers('click_0', missing) }) }),
+    /do not cover exactly the offered options/,
+  );
+  const notArgmax = { ...all, click_0: 0.4, done: 0.6 };
+  await assert.rejects(
+    () => decide(decideRequest(), { askFn: async () => ({ answers: answers('click_0', notArgmax) }) }),
+    /not the probability argmax/,
+  );
+  const unoffered = { ...all, copy_3: 0.5 };
+  await assert.rejects(
+    () => decide(decideRequest(), { askFn: async () => ({ answers: answers('done', unoffered) }) }),
+    /options that were not offered/,
+  );
+});
+
+test('buildDecideRequest rejects a request without a goal or elements', () => {
+  assert.throws(() => buildDecideRequest({ elements: [] }), /goal string/);
+  assert.throws(() => buildDecideRequest({ goal: 'g' }), /elements array/);
+});
+
+test('decide reports which caller element each numbered row came from', async () => {
+  const offScreen = {
+    pkg: 'com.android.settings',
+    class: 'android.widget.FrameLayout',
+    bounds: { l: 2000, t: 3000, r: 2100, b: 3100 }, // outside the 1080x2400 viewport
+    center: { x: 2050, y: 3050 },
+  };
+  const elements = [offScreen, ...decideElements()];
+  const request = decideRequest({ elements });
+  const { sources, centers } = buildDecideRequest(request);
+  assert.equal(sources['0'], 1, 'row 0 is the first surviving caller element, not element 0');
+  assert.equal(sources['1'], 2);
+  assert.deepEqual(centers['0'], { x: 250, y: 150 }, 'each row carries its tap point');
+
+  const { questions } = buildDecideRequest(request);
+  const ids = Object.keys(questions.operation.criteria);
+  const probabilities = Object.fromEntries(ids.map((k) => [k, 0]));
+  probabilities.click_0 = 1;
+  const res = await decide(request, {
+    askFn: async () => ({
+      answers: { operation: { choice: 'click_0', probabilities }, goal_met: { noul: 0 } },
+      latencyMs: 1,
+    }),
+  });
+  assert.equal(res.sources['0'], 1, 'the host can map the chosen row back to its own element');
+  assert.deepEqual(res.centers['0'], { x: 250, y: 150 }, 'and tap it without re-resolving indices');
+});
+
+test('serveDecide answers one JSON line per request on one process', async () => {
+  const input = (async function* () {
+    yield JSON.stringify({ goal: 'turn wifi off', elements: [] }) + '\n';
+    yield JSON.stringify({ goal: 'open settings', elements: [] }) + '\n';
+  })();
+  const written = [];
+  const output = { write: (chunk) => written.push(chunk) };
+  const seen = [];
+  const askFn = async ({ state, questions }) => {
+    seen.push(state.goal);
+    const ids = Object.keys(questions.operation.criteria);
+    const probabilities = Object.fromEntries(ids.map((k) => [k, k === 'wait' ? 1 : 0]));
+    return { answers: { operation: { choice: 'wait', probabilities }, goal_met: { noul: 0 } }, latencyMs: 1 };
+  };
+
+  await serveDecide(input, output, askFn);
+
+  assert.equal(written.length, 2, 'one answer line per request line');
+  const first = JSON.parse(written[0]);
+  assert.equal(first.ok, true);
+  assert.equal(first.operation.choice, 'wait');
+  assert.deepEqual(seen, ['turn wifi off', 'open settings']);
+});
+
+test('serveDecide reports a bad request without dropping the session', async () => {
+  const input = (async function* () {
+    yield 'not json\n';
+    yield JSON.stringify({ goal: 'g', elements: [] }) + '\n';
+  })();
+  const written = [];
+  const askFn = async ({ questions }) => {
+    const ids = Object.keys(questions.operation.criteria);
+    const probabilities = Object.fromEntries(ids.map((k) => [k, k === 'done' ? 1 : 0]));
+    return { answers: { operation: { choice: 'done', probabilities }, goal_met: { noul: 1 } }, latencyMs: 1 };
+  };
+
+  await serveDecide(input, { write: (c) => written.push(c) }, askFn);
+
+  assert.equal(JSON.parse(written[0]).ok, false);
+  assert.equal(JSON.parse(written[1]).ok, true, 'the next request is still served');
+});
+
+// --- sliders, long press, answers, clipboard, horizontal scroll --------------
+
+test('sliderStops offers only the positions the goal names', () => {
+  assert.deepEqual(
+    sliderStops('Turn brightness to the max value.').map((s) => s.key),
+    ['max'],
+  );
+  assert.deepEqual(
+    sliderStops('Set the volume to minimum').map((s) => s.key),
+    ['min'],
+  );
+  assert.deepEqual(
+    sliderStops('set it to 30%').map((s) => s.fraction),
+    [0.3],
+  );
+  assert.deepEqual(sliderStops('Open the Settings app'), [], 'no position named, no stop offered');
+});
+
+test('slider stops are offered only on range rows', () => {
+  const table = [
+    { idx: 0, row: '[0] click "Brightness level"', el: { clickable: true, text: 'Brightness level' } },
+    { idx: 1, row: '[1] range "197.0"', el: { class: 'android.widget.SeekBar', text: '197.0' } },
+  ];
+  const keys = Object.keys(buildQuestions({ goal: 'set brightness to maximum', table }).operation.criteria);
+  assert.ok(keys.includes('set_1_max'), `a named position lands on the slider: ${keys}`);
+  assert.ok(!keys.some((k) => k.startsWith('set_0')), 'no stop on a row that is not a slider');
+  const none = Object.keys(buildQuestions({ goal: 'open Settings', table }).operation.criteria);
+  assert.ok(!none.some((k) => k.startsWith('set_')), `a goal naming no position offers no stop: ${none}`);
+});
+
+test('slideGesture overshoots the track so the ends clamp', () => {
+  const el = { bounds: { l: 100, t: 200, r: 900, b: 260 } };
+  assert.deepEqual(slideGesture(el, 0), { x1: 500, y1: 230, x2: 60, y2: 230, durationMs: 400 });
+  assert.deepEqual(slideGesture(el, 1), { x1: 500, y1: 230, x2: 940, y2: 230, durationMs: 400 });
+  assert.equal(slideGesture(el, 0.5).x2, 500, 'a middle stop drags to the middle of the track');
+});
+
+test('long press is offered only where a row has a context menu', () => {
+  const table = [
+    { idx: 0, row: '[0] click+longclick "Note"', el: { clickable: true, longClickable: true } },
+    { idx: 1, row: '[1] click "Other"', el: { clickable: true } },
+  ];
+  const keys = Object.keys(buildQuestions({ goal: 'delete the note', table }).operation.criteria);
+  assert.ok(keys.includes('hold_0') && !keys.includes('hold_1'), `hold only on long-clickable rows: ${keys}`);
+});
+
+test('answer options appear only when the host can submit them', () => {
+  const table = [
+    { idx: 0, row: '[0] text "Android version"', el: { text: 'Android version' } },
+    { idx: 1, row: '[1] text "14"', el: { clickable: false, text: '14' } },
+  ];
+  const off = Object.keys(buildQuestions({ goal: 'what is the Android version', table }).operation.criteria);
+  assert.ok(!off.some((k) => k.startsWith('answer')), `no answers unless asked for: ${off}`);
+  const on = Object.keys(
+    buildQuestions({ goal: 'what is the Android version', table, answers: true }).operation.criteria,
+  );
+  assert.ok(on.includes('answer_0') && on.includes('answer_1'), `every text row is a candidate: ${on}`);
+  const withTexts = Object.keys(
+    buildQuestions({ goal: 'is it a todo', table, answers: true, texts: ['True', 'False'] }).operation.criteria,
+  );
+  assert.ok(
+    withTexts.includes('answer_text_0') && withTexts.includes('answer_text_1'),
+    `stated literals are offered verbatim: ${withTexts}`,
+  );
+});
+
+test('answer_list is offered for a container holding several items', () => {
+  const table = [
+    { idx: 0, row: '[0] scroll "Tasks"', el: { scrollable: true, bounds: { l: 0, t: 0, r: 1080, b: 2000 } } },
+    { idx: 1, row: '[1] text "Buy milk"', el: { text: 'Buy milk', bounds: { l: 20, t: 100, r: 400, b: 160 } } },
+    { idx: 2, row: '[2] text "Call mom"', el: { text: 'Call mom', bounds: { l: 20, t: 200, r: 400, b: 260 } } },
+  ];
+  const keys = Object.keys(
+    buildQuestions({ goal: 'which tasks are due today', table, answers: true }).operation.criteria,
+  );
+  assert.ok(keys.includes('answer_list_0'), `the list is one candidate answer: ${keys}`);
+  assert.ok(!keys.includes('answer_list_1'), 'a row holding no items is no container');
+});
+
+test('answerFor resolves a row, a container and a goal-supplied value', () => {
+  const table = [
+    { idx: 0, row: '[0] scroll "Tasks"', el: { scrollable: true, bounds: { l: 0, t: 0, r: 1080, b: 2000 } } },
+    { idx: 1, row: '[1] text "Buy milk"', el: { text: 'Buy milk', bounds: { l: 20, t: 100, r: 400, b: 160 } } },
+    { idx: 2, row: '[2] text "Call mom"', el: { text: 'Call mom', bounds: { l: 20, t: 200, r: 400, b: 260 } } },
+  ];
+  assert.equal(answerFor('answer_1', { table }), 'Buy milk');
+  assert.equal(answerFor('answer_list_0', { table }), 'Buy milk, Call mom');
+  assert.equal(answerFor('answer_text_1', { table, values: ['True', 'False'] }), 'False');
+  assert.equal(answerFor('click_1', { table }), null, 'a non-answer choice submits nothing');
+});
+
+test('clipboard ops are what the host says it can execute', () => {
+  const table = [{ idx: 0, row: '[0] edit "Search"', el: { class: 'android.widget.EditText', text: 'x' } }];
+  const on = Object.keys(
+    buildQuestions({ goal: 'copy the text to the clipboard', table, texts: ['abc'] }).operation.criteria,
+  );
+  assert.ok(on.includes('clip_0'), `the goal-supplied value can go to the clipboard: ${on}`);
+  const elsewhere = Object.keys(
+    buildQuestions({ goal: 'add a note named a.txt', table, texts: ['a.txt'] }).operation.criteria,
+  );
+  assert.ok(
+    !elsewhere.some((k) => k.startsWith('clip_')),
+    `no clip option for a goal that never says clipboard: ${elsewhere}`,
+  );
+  const off = Object.keys(
+    buildQuestions({ goal: 'copy the text to the clipboard', table, texts: ['abc'], clipboard: false }).operation
+      .criteria,
+  );
+  assert.ok(
+    !off.some((k) => k.startsWith('clip_') || k.startsWith('copy_') || k === 'paste'),
+    `no clipboard ops for a host without one: ${off}`,
+  );
+});
+
+test('horizontal scroll is offered only when the dump shows a horizontal area', () => {
+  const vertical = [
+    { idx: 0, row: '[0] scroll "List"', el: { scrollable: true, bounds: { l: 0, t: 0, r: 1080, b: 2000 } } },
+  ];
+  const vKeys = Object.keys(buildQuestions({ goal: 'g', table: vertical }).operation.criteria);
+  assert.ok(!vKeys.includes('scroll_right'), `a tall list is not horizontal: ${vKeys}`);
+  const pager = [
+    {
+      idx: 0,
+      row: '[0] scroll "Pages"',
+      el: {
+        scrollable: true,
+        class: 'androidx.viewpager2.widget.ViewPager2',
+        bounds: { l: 0, t: 500, r: 1080, b: 1500 },
+      },
+    },
+  ];
+  const hKeys = Object.keys(buildQuestions({ goal: 'g', table: pager }).operation.criteria);
+  assert.ok(hKeys.includes('scroll_left') && hKeys.includes('scroll_right'), `a pager pages sideways: ${hKeys}`);
+});
+
+test('listItems drops the label inside its own row and reads in screen order', () => {
+  const table = [
+    { idx: 0, row: '[0] scroll "List"', el: { scrollable: true, bounds: { l: 0, t: 0, r: 1080, b: 2000 } } },
+    {
+      idx: 1,
+      row: '[1] click "Check the tires"',
+      el: { clickable: true, text: 'Check the tires', bounds: { l: 20, t: 400, r: 900, b: 500 } },
+    },
+    {
+      idx: 2,
+      row: '[2] text "Check the tires"',
+      el: { text: 'Check the tires', bounds: { l: 40, t: 420, r: 400, b: 480 } },
+    },
+    {
+      idx: 3,
+      row: '[3] click "Book a flight"',
+      el: { clickable: true, text: 'Book a flight', bounds: { l: 20, t: 300, r: 900, b: 400 } },
+    },
+  ];
+  assert.deepEqual(
+    listItems(table, 0).map((r) => elementText(r.el)),
+    ['Book a flight', 'Check the tires'],
+  );
+});
+
+test('scrollAnchor moves the scrollable that holds the focus', () => {
+  const table = [
+    {
+      idx: 0,
+      row: '[0] scroll "Page"',
+      el: { scrollable: true, bounds: { l: 0, t: 0, r: 1080, b: 2400 }, center: { x: 540, y: 1200 } },
+    },
+    {
+      idx: 1,
+      row: '[1] scroll "Hours"',
+      el: { scrollable: true, bounds: { l: 700, t: 800, r: 900, b: 1100 }, center: { x: 800, y: 950 } },
+    },
+    {
+      idx: 2,
+      row: '[2] text "10"',
+      el: { focused: true, text: '10', bounds: { l: 720, t: 850, r: 880, b: 950 }, center: { x: 800, y: 900 } },
+    },
+  ];
+  assert.deepEqual(scrollAnchor(table, { w: 1080, h: 2400 }), { x: 800, y: 950 });
+});
+
+test('app candidates become one-step launch options', () => {
+  const table = [{ idx: 0, row: '[0] click "Chrome"', el: { clickable: true, text: 'Chrome' } }];
+  const keys = Object.keys(
+    buildQuestions({ goal: 'open Markor', table, apps: ['markor', 'simple calendar pro'] }).operation.criteria,
+  );
+  assert.ok(keys.includes('launch_0') && keys.includes('launch_1'), `one option per offered app: ${keys}`);
+  const none = Object.keys(buildQuestions({ goal: 'open Markor', table }).operation.criteria);
+  assert.ok(!none.some((k) => k.startsWith('launch_')), `no launch options without candidates: ${none}`);
+});
+
+test('parseApp takes "Label=package" or a bare package', () => {
+  assert.deepEqual(parseApp('Settings=com.android.settings'), { label: 'Settings', pkg: 'com.android.settings' });
+  assert.deepEqual(parseApp('com.android.settings'), { label: 'settings', pkg: 'com.android.settings' });
+  assert.throws(() => parseApp('=com.android.settings'), /needs "Label=package"/);
+  assert.throws(() => parseApp('Settings='), /needs "Label=package"/);
+});
+
+test('a paste-only clipboard is offered when the host says it is filled', () => {
+  const table = [{ idx: 0, row: '[0] edit "Body"', el: { class: 'android.widget.EditText' } }];
+  const cold = Object.keys(buildQuestions({ goal: 'paste it', table }).operation.criteria);
+  assert.ok(!cold.includes('paste'), 'no paste before a copy this run');
+  const warm = Object.keys(buildQuestions({ goal: 'paste it', table, clipboardReady: true }).operation.criteria);
+  assert.ok(warm.includes('paste'), `a host-filled clipboard offers paste: ${warm}`);
+});
+
+test('a date row is flagged so the picker route is visible', () => {
+  assert.ok(isDateLabel('October 15 (Sun)') && isDateLabel('Oct 8') && isDateLabel('2023-10-26'));
+  assert.ok(!isDateLabel('15:34'), 'the status-bar clock is not a date row');
+  const els = [
+    {
+      class: 'android.widget.TextView',
+      text: 'October 15 (Sun)',
+      clickable: true,
+      bounds: { l: 0, t: 0, r: 400, b: 60 },
+    },
+  ];
+  const rows = buildTable(els, { w: 1080, h: 2400 });
+  assert.ok(rows[0].row.includes('date'), `the row carries the flag: ${rows[0].row}`);
+});
+
+test('foreign status-bar chrome is dropped from the table', () => {
+  const els = [
+    {
+      pkg: 'com.simplemobiletools.calendar.pro',
+      class: 'android.widget.TextView',
+      text: 'October 15 (Sun)',
+      bounds: { l: 0, t: 300, r: 400, b: 360 },
+    },
+    {
+      pkg: 'com.simplemobiletools.calendar.pro',
+      class: 'android.widget.TextView',
+      text: 'Search',
+      clickable: true,
+      bounds: { l: 0, t: 80, r: 200, b: 120 },
+    },
+    {
+      pkg: 'com.android.systemui',
+      class: 'android.widget.TextView',
+      text: '15:34',
+      clickable: true,
+      bounds: { l: 700, t: 0, r: 800, b: 60 },
+    },
+    {
+      pkg: 'com.android.systemui',
+      class: 'android.widget.SeekBar',
+      text: 'Display brightness',
+      bounds: { l: 42, t: 149, r: 1038, b: 275 },
+    },
+  ];
+  const rows = serializeRows(buildTable(els, { w: 1080, h: 2400 }));
+  assert.ok(
+    rows.some((r) => r.includes('October 15')),
+    `the app's own rows stay: ${rows}`,
+  );
+  assert.ok(!rows.some((r) => r.includes('15:34')), `the clock is chrome: ${rows}`);
+  assert.ok(
+    rows.some((r) => r.includes('Display brightness')),
+    `a foreign dialog below the status bar stays: ${rows}`,
+  );
+  assert.ok(
+    rows.some((r) => r.includes('Search')),
+    `an app row in the top band is never chrome: ${rows}`,
+  );
+});
+
+test('an editable row is typed into, not clicked', () => {
+  const table = [{ idx: 0, row: '[0] edit "Search"', el: { clickable: true, class: 'android.widget.EditText' } }];
+  const keys = Object.keys(buildQuestions({ goal: 'g', table, texts: ['abc'] }).operation.criteria);
+  assert.ok(keys.includes('type_0_0'), `the field can be typed into: ${keys}`);
+  assert.ok(!keys.includes('click_0'), `a bare click on a field is the trap, not an option: ${keys}`);
+  const withPaste = Object.keys(
+    buildQuestions({ goal: 'paste it', table, texts: ['abc'], clipboardReady: true }).operation.criteria,
+  );
+  assert.ok(withPaste.includes('click_0'), `paste needs the field focusable by click: ${withPaste}`);
+});
+
+test('a split name/extension dialog is explained when the goal names a file', () => {
+  const table = [{ idx: 0, row: '[0] edit "my_note"', el: { clickable: true, class: 'android.widget.EditText' } }];
+  const withFile = buildQuestions({ goal: 'create a note named a.txt', table, texts: ['a.txt', 'a'] });
+  assert.match(withFile.operation.instructions.rules.join('\n'), /extension field/);
+  const noFile = buildQuestions({ goal: 'turn off wifi', table, texts: ['5'] });
+  assert.ok(!/extension field/.test(noFile.operation.instructions.rules.join('\n')), 'and stays out of other goals');
 });

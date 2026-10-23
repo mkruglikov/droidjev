@@ -18,18 +18,63 @@ export async function tap(serial, center) {
   await shellOk(serial, [...AWAKE, 'input', 'tap', String(center.x), String(center.y)], { timeoutMs: 8000 });
 }
 
+// One gesture, clamped inside the screen: `input swipe` silently no-ops on
+// negative coordinates.
+async function swipe(serial, { x1, y1, x2, y2, durationMs }) {
+  await shellOk(
+    serial,
+    [...AWAKE, 'input', 'swipe', String(x1), String(y1), String(x2), String(y2), String(durationMs)],
+    { timeoutMs: 8000 },
+  );
+}
+
 // Scroll gesture that stays inside the screen: symmetric around the anchor,
-// both endpoints clamped. input swipe silently no-ops on negative coords.
+// both endpoints clamped.
 export async function scrollSwipe(serial, anchor, dy, screenH, direction = 'down', durationMs = 300) {
   const margin = 40;
   const half = Math.round(Math.abs(dy) / 2);
   const y1 = direction === 'down' ? Math.min(anchor.y + half, screenH - margin) : Math.max(anchor.y - half, margin);
   const y2 = direction === 'down' ? Math.max(anchor.y - half, margin) : Math.min(anchor.y + half, screenH - margin);
-  await shellOk(
-    serial,
-    [...AWAKE, 'input', 'swipe', String(anchor.x), String(y1), String(anchor.x), String(y2), String(durationMs)],
-    { timeoutMs: 8000 },
-  );
+  await swipe(serial, { x1: anchor.x, y1, x2: anchor.x, y2, durationMs });
+}
+
+// The same, on the other axis: the finger travels toward the content the goal
+// is looking for, so `right` reveals what is off to the right.
+export async function scrollSwipeX(serial, anchor, dx, screenW, direction = 'right', durationMs = 300) {
+  const margin = 40;
+  const half = Math.round(Math.abs(dx) / 2);
+  const x1 = direction === 'right' ? Math.min(anchor.x + half, screenW - margin) : Math.max(anchor.x - half, margin);
+  const x2 = direction === 'right' ? Math.max(anchor.x - half, margin) : Math.min(anchor.x + half, screenW - margin);
+  await swipe(serial, { x1, y1: anchor.y, x2, y2: anchor.y, durationMs });
+}
+
+// A slider's value follows the touch, so a tap lands where the finger did —
+// and near the ends it lands short of them (a tap 3px from the right edge of
+// the brightness slider left 251/255). Press the track to grab the thumb
+// (Android's SeekBar jumps it to the press point), drag on to the target, and
+// for the extremes overshoot off the track so the value clamps to min/max.
+// The numbers are returned on their own so a host that executes the decision
+// itself sends the very same gesture.
+export function slideGesture(el, fraction) {
+  const { l, t, r, b } = el.bounds;
+  const cy = Math.round((t + b) / 2);
+  const margin = 40;
+  const x2 = fraction <= 0 ? l - margin : fraction >= 1 ? r + margin : Math.round(l + fraction * (r - l));
+  return { x1: Math.round((l + r) / 2), y1: cy, x2, y2: cy, durationMs: 400 };
+}
+
+export async function slideTo(serial, el, fraction) {
+  await swipe(serial, slideGesture(el, fraction));
+}
+
+// Press and hold: identical endpoints with a long duration is the only
+// press-and-hold `input` can send, and a context menu (rename, delete, move,
+// share) is where most lists keep the operations that have no visible button.
+export async function longPress(serial, center, holdMs = 800) {
+  if (!center || !Number.isInteger(center.x) || !Number.isInteger(center.y)) {
+    throw new DroidJevError('internal: longPress called without integer center');
+  }
+  await swipe(serial, { x1: center.x, y1: center.y, x2: center.x, y2: center.y, durationMs: holdMs });
 }
 
 export async function keyevent(serial, code) {

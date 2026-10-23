@@ -22,6 +22,18 @@ droidjev act "open the Contacts app and create a new contact named Maria, phone 
 
 ![Adding a contact](assets/contact.gif)
 
+## What `act` can do
+
+Each step, the model picks from what the screen actually offers: tap a visible
+element, **long-press** one for its context menu (rename, delete, share), **type**
+a `--text` value into a field, **drag a slider** to its minimum, maximum, middle
+or a percentage, **scroll** vertically and horizontally, **copy** on-screen text
+to the clipboard and **paste** it into a focused field, **open an app by name**
+(`--app`, one step from anywhere), and — for a question goal — **answer** with
+the text it found on screen (`--answer`) instead of changing anything. It never
+types a value you did not pass, and it never invents coordinates: every action
+resolves to a row of the dumped element table.
+
 ## Prerequisites
 
 1. **Node.js ≥ 20** — required for everything; droidjev has zero npm
@@ -86,11 +98,20 @@ droidjev snapshot [--grep "…"]   indexed element table of the current screen (
 droidjev find "<label>" [--tap]  deterministically search scrollable content top-down
                                  for a label and optionally tap it (~0.6s/iteration,
                                  no tokens); stops as soon as scrolling provably cannot help
-droidjev act "<goal>" [flags]    run the agent loop until done/blocked
+droidjev act "<goal>" [flags]    run the agent loop until done/blocked/answered
+                                 (answers a question goal with --answer)
+droidjev decide [--serve]        one decision from a JSON request on stdin (one per
+                                 line with --serve), no adb: the same element table,
+                                 questions and strict validation `act` uses, for a host
+                                 that already has its own observation and action
+                                 pipeline (a benchmark harness, a web driver)
 ```
 
 Flags: `--device SERIAL|AVD` · `--text "…"` (repeatable — one per form value, e.g.
 `--text Mary --text +79001234567` fills name and phone fields; never guessed) ·
+`--app "Label=package"` (repeatable — an app the model may open by name in one
+step; a bare package is labelled by its last segment) · `--answer` (the goal is a
+question: offer the answer options and print the submitted answer) ·
 `--max-steps N` (act, default 12) · `--max-iterations N` (find, default 20) ·
 `--json` (full trace) · `--no-animations` (disable animations for the run;
 restored after).
