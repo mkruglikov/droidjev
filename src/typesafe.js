@@ -10,7 +10,10 @@ const API_URL = 'https://api.typesafe.ai/v1/systemone';
 // (jev-latest still resolves to 1.13.0 at the time of writing), and 1.14's
 // multilingual gains feed the cross-locale matching the prompts rely on.
 const MODEL = 'jev-1.14.0';
-const RETRY_STATUS = new Set([429, 529, 503]);
+// 451 joins the set: the region-block flap lasts minutes, and the retried
+// final error ("typesafe api failed after N attempts: typesafe api 451") is
+// what the benchmark adapter's transport-retry ladder keys on.
+const RETRY_STATUS = new Set([429, 529, 503, 451]);
 const MAX_ATTEMPTS = 3;
 
 let cachedKey = null;
