@@ -12,7 +12,8 @@
 // while it lives, the android CLI's own layout commands stay displaced —
 // stop() (also used internally for restarts) hands UiAutomation back.
 import { spawn } from 'node:child_process';
-import { access, mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { shell } from './adb.js';
@@ -21,21 +22,125 @@ import { DroidJevError, run, sleep } from './util.js';
 const PKG = 'io.appium.uiautomator2.server';
 const TEST_PKG = `${PKG}.test`;
 const RUNNER = 'androidx.test.runner.AndroidJUnitRunner';
-const PORT = 6790;
-const BASE = `http://127.0.0.1:${PORT}`;
+// The on-device server always listens here; only the LOCAL side of the adb
+// forward is per-serial, so two devices in one process cannot collide.
+const DEVICE_PORT = 6790;
+const sessions = new Map();
+const ensured = new Set(); // serials whose forward + server are known-good
 const CACHE = join(homedir(), '.cache', 'droidjev', 'uia2');
-const RELEASES = 'https://api.github.com/repos/appium/appium-uiautomator2-server/releases/latest';
-const SETTINGS_RELEASES = 'https://api.github.com/repos/appium/io.appium.settings/releases/latest';
 const SETTINGS_PKG = 'io.appium.settings';
 const CLI_INSTRUMENTATION = 'com.android.cli.interact.instrumentation';
 
-let sessionId;
-const ensured = new Set(); // serials whose forward + server are known-good
+// The first serial keeps the default port (every existing setup is unchanged);
+// later ones get a stable hash-derived port in 6790-6853, skipping anything in
+// use. Per-process only: two separate CLI processes can still pick the same
+// local port, which is harmless while each drives one device.
+export function pickPort(used, serial) {
+  if (!used.length) return DEVICE_PORT;
+  const hash = createHash('sha256').update(String(serial)).digest('hex').slice(0, 8);
+  const start = DEVICE_PORT + (parseInt(hash, 16) % 64);
+  for (let i = 0; i < 64; i++) {
+    const port = DEVICE_PORT + ((start - DEVICE_PORT + i) % 64);
+    if (!used.includes(port)) return port;
+  }
+  return DEVICE_PORT;
+}
 
-async function httpJson(path, init = {}, timeoutMs = 15000) {
-  const res = await fetch(BASE + path, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+export function sessionFor(serial) {
+  let s = sessions.get(serial);
+  if (!s) {
+    s = {
+      port: pickPort(
+        [...sessions.values()].map((v) => v.port),
+        serial,
+      ),
+      sessionId: null,
+    };
+    sessions.set(serial, s);
+  }
+  return s;
+}
+
+const baseOf = (serial) => `http://127.0.0.1:${sessionFor(serial).port}`;
+
+export async function httpJson(serial, path, init = {}, timeoutMs = 15000) {
+  const res = await fetch(baseOf(serial) + path, { ...init, signal: AbortSignal.timeout(timeoutMs) });
   if (!res.ok) throw new DroidJevError(`uia2 HTTP ${res.status} on ${path}`);
   return res.json();
+}
+
+// Pinned helper APKs: exact release assets + SHA-256, verified before anything
+// reaches a device. Bump deliberately (edit url and sha together). `latest`
+// is not a version, and a cached or tampered file must never install silently.
+export const PINNED = {
+  tag: { server: 'v10.6.6', settings: 'v8.2.1' },
+  assets: {
+    server: {
+      url: 'https://github.com/appium/appium-uiautomator2-server/releases/download/v10.6.6/appium-uiautomator2-server-v10.6.6.apk',
+      sha256: '8ff760a2a86b487f53090fbdcd5b0360e67d02bb811887d527a9557b0d59c80d',
+    },
+    test: {
+      url: 'https://github.com/appium/appium-uiautomator2-server/releases/download/v10.6.6/appium-uiautomator2-server-debug-androidTest.apk',
+      sha256: 'e6f729287d72351388fd66597c35b69988b9091a7011954bf92a55d416cb1e1c',
+    },
+    settings: {
+      url: 'https://github.com/appium/io.appium.settings/releases/download/v8.2.1/settings_apk-debug.apk',
+      sha256: 'e4024b3ee348929252bcaf5eb422bcab9e4ace96703499a84f3332281c03375f',
+    },
+  },
+};
+
+export function sha256Matches(buf, hex) {
+  return createHash('sha256').update(buf).digest('hex') === String(hex).toLowerCase();
+}
+
+const fetchDefault = (url) => fetch(url, { signal: AbortSignal.timeout(180000) });
+const adbInstallDefault = (args) => run('adb', args, { timeoutMs: 180000 });
+
+// Download (or reuse) one pinned asset, verify its hash, install it. The cache
+// key carries the sha, so a new pin can never pick up a stale file; a corrupt
+// cache entry is re-downloaded instead of failing the run.
+export async function installApk(serial, asset, deps = {}) {
+  const fetchImpl = deps.fetchImpl ?? fetchDefault;
+  const cacheDir = deps.cacheDir ?? CACHE;
+  const adbInstall = deps.adbInstall ?? adbInstallDefault;
+  const base = asset.url
+    .split('/')
+    .pop()
+    .replace(/\.apk$/i, '');
+  const file = join(cacheDir, `${base}-${asset.sha256.slice(0, 8)}.apk`);
+  let buf = null;
+  try {
+    buf = await readFile(file);
+    if (!sha256Matches(buf, asset.sha256)) buf = null;
+  } catch {
+    /* not cached */
+  }
+  if (!buf) {
+    const res = await fetchImpl(asset.url);
+    if (!res.ok) throw new DroidJevError(`download of ${base}.apk failed: HTTP ${res.status}`);
+    buf = Buffer.from(await res.arrayBuffer());
+    const got = createHash('sha256').update(buf).digest('hex');
+    if (!sha256Matches(buf, asset.sha256)) {
+      throw new DroidJevError(
+        `download of ${base}.apk failed sha256: expected ${asset.sha256.slice(0, 12)}, got ${got.slice(0, 12)}`,
+      );
+    }
+    await mkdir(cacheDir, { recursive: true });
+    await writeFile(file, buf);
+  }
+  const r = await adbInstall(['-s', serial, 'install', '-r', '-t', file]);
+  if (!/Success/.test(r.stdout + r.stderr)) {
+    throw new DroidJevError(`adb install of ${base}.apk failed: ${(r.stderr || r.stdout).trim().slice(0, 200)}`);
+  }
+  return file;
+}
+
+async function install(serial) {
+  console.error(
+    `# uia2: installing pinned helper APKs (uia2 ${PINNED.tag.server}, settings ${PINNED.tag.settings}; one-time, ~21MB)`,
+  );
+  for (const kind of ['server', 'test', 'settings']) await installApk(serial, PINNED.assets[kind]);
 }
 
 async function installed(serial) {
@@ -44,48 +149,6 @@ async function installed(serial) {
     if (!(r.code === 0 && r.stdout.includes('package:'))) return false;
   }
   return true;
-}
-
-async function installApk(serial, url) {
-  const file = join(CACHE, url.split('/').pop());
-  try {
-    await access(file);
-  } catch {
-    const res = await fetch(url, { signal: AbortSignal.timeout(180000) });
-    // The cache key is the filename: an error page saved as <name>.apk would
-    // poison every later run's adb install.
-    if (!res.ok) throw new DroidJevError(`download of ${url.split('/').pop()} failed: HTTP ${res.status}`);
-    const buf = Buffer.from(await res.arrayBuffer());
-    await writeFile(file, buf);
-  }
-  const r = await run('adb', ['-s', serial, 'install', '-r', '-t', file], { timeoutMs: 180000 });
-  if (!/Success/.test(r.stdout + r.stderr)) {
-    throw new DroidJevError(
-      `adb install of ${url.split('/').pop()} failed: ${(r.stderr || r.stdout).trim().slice(0, 200)}`,
-    );
-  }
-}
-
-async function install(serial) {
-  console.error('# uia2: fetching appium-uiautomator2-server release (one-time, ~18MB)');
-  const rel = await fetch(RELEASES, { headers: { 'user-agent': 'droidjev' }, signal: AbortSignal.timeout(30000) });
-  if (!rel.ok) throw new DroidJevError(`github releases HTTP ${rel.status} for uia2 server`);
-  const urls = {};
-  for (const a of (await rel.json()).assets || []) {
-    if (a.name.endsWith('.apk')) urls[a.name.includes('androidTest') ? 'test' : 'server'] = a.browser_download_url;
-  }
-  if (!urls.server || !urls.test) throw new DroidJevError('latest uia2 release has no server+test apk assets');
-  await mkdir(CACHE, { recursive: true });
-  for (const kind of ['server', 'test']) await installApk(serial, urls[kind]);
-  console.error('# uia2: fetching io.appium.settings release (one-time, ~3MB, clipboard companion)');
-  const srel = await fetch(SETTINGS_RELEASES, {
-    headers: { 'user-agent': 'droidjev' },
-    signal: AbortSignal.timeout(30000),
-  });
-  if (!srel.ok) throw new DroidJevError(`github releases HTTP ${srel.status} for io.appium.settings`);
-  const asset = ((await srel.json()).assets || []).find((a) => a.name.endsWith('.apk'));
-  if (!asset) throw new DroidJevError('latest io.appium.settings release has no apk asset');
-  await installApk(serial, asset.browser_download_url);
 }
 
 function startInstrument(serial) {
@@ -103,14 +166,17 @@ function startInstrument(serial) {
   p.unref();
 }
 
-async function waitReady(timeoutMs = 20000) {
+async function waitReady(serial, timeoutMs = 20000) {
   const deadline = Date.now() + timeoutMs;
+  const port = sessionFor(serial).port;
   for (;;) {
     try {
-      await httpJson('/wd/hub/status', {}, 1500);
+      await httpJson(serial, '/wd/hub/status', {}, 1500);
       return;
     } catch {
-      if (Date.now() > deadline) throw new DroidJevError('uia2 server did not become ready on port 6790 within 20s');
+      if (Date.now() > deadline) {
+        throw new DroidJevError(`uia2 server did not become ready on port ${port} within 20s`);
+      }
       await sleep(250);
     }
   }
@@ -118,9 +184,11 @@ async function waitReady(timeoutMs = 20000) {
 
 export async function ensure(serial) {
   if (ensured.has(serial)) return;
-  await run('adb', ['-s', serial, 'forward', `tcp:${PORT}`, `tcp:${PORT}`], { timeoutMs: 8000 });
+  const port = sessionFor(serial).port;
+  // The local side is per-serial; the device side is always 6790.
+  await run('adb', ['-s', serial, 'forward', `tcp:${port}`, `tcp:${DEVICE_PORT}`], { timeoutMs: 8000 });
   try {
-    await httpJson('/wd/hub/status', {}, 1500);
+    await httpJson(serial, '/wd/hub/status', {}, 1500);
     ensured.add(serial);
     return; // already resident from a previous step/run
   } catch {
@@ -133,23 +201,24 @@ export async function ensure(serial) {
     await shell(serial, ['am', 'force-stop', CLI_INSTRUMENTATION], { timeoutMs: 8000 });
   } catch {}
   startInstrument(serial);
-  await waitReady();
+  await waitReady(serial);
   ensured.add(serial);
 }
 
-async function ensureSession() {
-  if (sessionId) return sessionId;
-  const j = await httpJson('/wd/hub/session', {
+async function ensureSession(serial) {
+  const s = sessionFor(serial);
+  if (s.sessionId) return s.sessionId;
+  const j = await httpJson(serial, '/wd/hub/session', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       capabilities: { alwaysMatch: { platformName: 'android', 'appium:automationName': 'UiAutomator2' } },
     }),
   });
-  sessionId = j?.sessionId || j?.value?.sessionId || null;
-  if (!sessionId)
+  s.sessionId = j?.sessionId || j?.value?.sessionId || null;
+  if (!s.sessionId)
     throw new DroidJevError(`uia2 session not created: ${(j?.value?.message || 'no session id').slice(0, 200)}`);
-  return sessionId;
+  return s.sessionId;
 }
 
 // Fetch the hierarchy XML. One full restart on failure: the server or session
@@ -158,14 +227,14 @@ export async function source(serial) {
   for (let attempt = 0; ; attempt++) {
     await ensure(serial);
     try {
-      const sid = await ensureSession();
-      const xml = (await httpJson(`/wd/hub/session/${sid}/source`, {}, 20000))?.value;
+      const sid = await ensureSession(serial);
+      const xml = (await httpJson(serial, `/wd/hub/session/${sid}/source`, {}, 20000))?.value;
       if (typeof xml !== 'string' || !xml.includes('<hierarchy')) {
         throw new DroidJevError('uia2 source returned no hierarchy xml');
       }
       return xml;
     } catch (e) {
-      sessionId = null;
+      sessionFor(serial).sessionId = null;
       if (attempt >= 1) throw e;
       await stop(serial);
     }
@@ -179,8 +248,9 @@ export async function setClipboard(serial, text) {
   for (let attempt = 0; ; attempt++) {
     await ensure(serial);
     try {
-      const sid = await ensureSession();
+      const sid = await ensureSession(serial);
       const r = await httpJson(
+        serial,
         `/wd/hub/session/${sid}/appium/device/set_clipboard`,
         {
           method: 'POST',
@@ -196,7 +266,7 @@ export async function setClipboard(serial, text) {
         throw new DroidJevError(`uia2 set_clipboard failed: ${(r.value.message || r.value.error).slice(0, 200)}`);
       return;
     } catch (e) {
-      sessionId = null;
+      sessionFor(serial).sessionId = null;
       if (attempt >= 1) throw e;
       await stop(serial);
     }
@@ -204,7 +274,7 @@ export async function setClipboard(serial, text) {
 }
 
 export async function stop(serial) {
-  sessionId = null;
+  sessions.delete(serial);
   ensured.delete(serial);
   for (const pkg of [PKG, CLI_INSTRUMENTATION]) {
     try {

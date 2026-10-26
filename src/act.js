@@ -114,5 +114,21 @@ export async function typeText(serial, text) {
   await shellOk(serial, ['input', 'text', safe], { timeoutMs: 10000 });
 }
 
+// Keypad digits in ONE adb invocation: every KEYCODE_0..9 token is
+// code-generated (the `;` join is the same contract as AWAKE), and one shell
+// call per digit is pure overhead.
+export function digitsArgs(seq) {
+  const args = [...AWAKE];
+  [...String(seq)].forEach((d, i) => {
+    if (i > 0) args.push(';');
+    args.push('input', 'keyevent', String(7 + Number(d)));
+  });
+  return args;
+}
+
+export async function typeDigits(serial, seq) {
+  await shellOk(serial, digitsArgs(seq), { timeoutMs: 15000 });
+}
+
 // paste (279) rides the focused field; callers must focus one first (tap).
 export const KEYS = { back: 4, home: 3, enter: 66, wake: 224, paste: 279 };

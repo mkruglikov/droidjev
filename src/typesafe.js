@@ -5,11 +5,17 @@
 //   validation failure nothing downstream executes
 import { DroidJevError, redact, sleep, run } from './util.js';
 
+// A malformed model answer is routine, not fatal: a caller may retry the same
+// request once. Lives here so every validator consumer shares one predicate.
+export const isValidationError = (e) => e instanceof DroidJevError && e.message.startsWith('invalid typesafe answer');
+
 const API_URL = 'https://api.typesafe.ai/v1/systemone';
 // Pinned, not jev-latest: the box primitive and image assets are 1.14-only
 // (jev-latest still resolves to 1.13.0 at the time of writing), and 1.14's
 // multilingual gains feed the cross-locale matching the prompts rely on.
-const MODEL = 'jev-1.14.0';
+// --model is an explicit operator escape hatch; vision refuses non-default
+// models because only 1.14+ answers the box primitive.
+export const DEFAULT_MODEL = 'jev-1.14.0';
 // 451 joins the set: the region-block flap lasts minutes, and the retried
 // final error ("typesafe api failed after N attempts: typesafe api 451") is
 // what the benchmark adapter's transport-retry ladder keys on.
@@ -103,9 +109,9 @@ export function prewarm() {
 // One request with N parallel questions. `assets` carries image assets; any
 // such request must send the danger-zone images header (400 otherwise).
 // Returns {answers, usage, latencyMs}.
-export async function ask({ state, questions, assets = null, timeoutMs = 20000 }) {
+export async function ask({ state, questions, assets = null, timeoutMs = 20000, model = DEFAULT_MODEL }) {
   const key = await requireApiKey();
-  const body = JSON.stringify({ model: MODEL, state, questions, ...(assets && { assets }) });
+  const body = JSON.stringify({ model, state, questions, ...(assets && { assets }) });
   let lastErr = null;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     if (attempt > 0) await sleep(500 * 2 ** (attempt - 1));
@@ -150,7 +156,7 @@ export async function ask({ state, questions, assets = null, timeoutMs = 20000 }
       return {
         answers: json.answers,
         usage: json.usage ?? null,
-        model: json.model ?? MODEL,
+        model: json.model ?? model,
         latencyMs: performance.now() - t0,
       };
     } catch (e) {

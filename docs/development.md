@@ -11,3 +11,7 @@ for f in src/*.js; do node --check "$f"; done   # syntax check — node --check
                                                 # src/*.js glob checks only
                                                 # the first
 ```
+
+`--trace` (or `DROIDJEV_TRACE=1`) records a run to
+`~/.cache/droidjev/runs/` as JSONL. These are local diagnostics for one
+investigation; they are never committed to the repository.

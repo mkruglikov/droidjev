@@ -6,8 +6,8 @@ description: Fast Android emulator UI automation, view-hierarchy first. Turns a 
 # droidjev
 
 DroidJev (`droidjev`) acts on an Android emulator from a natural-language goal.
-It dumps the view hierarchy (screenshots only when a screen exposes no
-accessibility nodes), asks the Typesafe jev model which indexed element
+It dumps the view hierarchy (screenshots only for a blind screen or a `check`
+verdict), asks the Typesafe jev model which indexed element
 advances the goal, taps it via adb, and verifies the screen changed — all in
 one CLI invocation. A typical 2-step goal finishes in ~6s. A powered-off
 emulator is fine: it auto-boots the first AVD (adds ~30–60s).
@@ -18,10 +18,30 @@ repository path. Requires Node.js ≥ 20, `adb`, the `android` CLI on PATH, and
 `TYPESAFE_API_KEY` in the environment. Missing prerequisites produce a clear
 warning and stop — fix what they name, do not work around them.
 
-## Fast paths first (deterministic, no model, no flailing)
+## Preferred usage: ONE act call with the full flow
 
-Do these directly when the task matches; they are faster and more reliable
-than `act`:
+Pass the whole user request to a single `act` invocation. `act` navigates,
+types, scrolls, copies and pastes, fills forms, and verifies the end state
+inside one run:
+
+```bash
+droidjev act "copy the IMEI from settings and paste it into chrome search bar"
+droidjev act "open the Contacts app and create a new contact named Maria, phone +79001234567" --text Maria --text +79001234567
+droidjev act "open language settings, pick Русский, confirm the dialog"
+```
+
+Give `act` the complete compound goal in one shot, not a chain of micro-goals
+— the model keeps context inside one run, and every restart re-navigates from
+scratch. Do NOT step through snapshot → decide → tap manually. Values the goal
+itself states — quoted strings, `from X to Y`, `named/phone/email` — are typed
+from the goal; pass `--text` only for a value the goal does not spell out.
+`act` never guesses text. The step budget (default 32) is a safety cap, not a
+target: normal flows finish well below it.
+
+## Deterministic helpers (optional)
+
+When the caller already knows the exact package or label, these skip the
+model and are useful for setup or a single targeted lookup:
 
 ```bash
 droidjev start com.android.settings   # launch an app by package (am start/monkey)
@@ -30,25 +50,9 @@ droidjev find "About phone" --tap     # search scrollable lists top-down for a
 droidjev snapshot --grep "battery"    # filtered view of the current screen
 ```
 
-Use `find` whenever the target is a labeled item in a long list (settings,
-language pickers, app lists). Use `start` whenever the goal names an app and
-you know or can resolve its package (`adb shell pm list packages` lists them).
-
-## Primary usage: ONE act call per goal
-
-For anything not covered by the fast paths, run the whole goal as a single
-`act` command — do NOT step through snapshot → decide → tap manually; that
-defeats the tool's speed.
-
-```bash
-droidjev act "open Settings"
-droidjev act "open About phone"
-droidjev act "toggle Airplane mode on"
-```
-
-Give `act` the complete compound goal in one shot ("open language settings,
-pick Русский, confirm the dialog"), not a chain of micro-goals — the model
-keeps context inside one run and every restart re-navigates from scratch.
+`find` suits a labeled item in a long list; `start` suits a goal that names an
+app whose package is known (`adb shell pm list packages` lists them). For a
+multi-step user task, still prefer one `act` call over composing these.
 
 Beyond taps, typing and scrolling (both axes), the loop can long-press an item
 to open its context menu (rename/delete/share), drag a slider to its minimum,
@@ -68,22 +72,58 @@ missing android CLI where needed, missing TYPESAFE_API_KEY, no AVD).
 | flag | meaning |
 |---|---|
 | `--device SERIAL\|AVD` | target when several emulators run (else: sole online, else auto-boot first AVD) |
-| `--text "…"` | value to type when the goal needs typing — the model picks the field, never the text; repeat once per value the goal names (`--text Maria --text +79001234567`) |
+| `--text "…"` | value to type when the goal does not state it — the model picks the field, never the text; values named in the goal (quoted, `from X to Y`, `named/phone/email`) are typed without it |
+| `--guidance "…"` | (act) operator/app lore for this run — a plan, an app's mechanics, a constraint; repeatable. The model still chooses each step |
 | `--app "Label=package"` | an app the model may open by name in one step — repeatable; a bare package is labelled by its last segment. It removes the walk through the launcher (and the ambiguity of two icons with the same label); the model still chooses which app the goal means |
 | `--answer` | the goal is a question: the `answer_*` options are offered and the submitted text is printed as `answer:` on exit 0 |
-| `--max-steps N` | action budget for act (default 12) |
+| `--max-steps N` | action budget for act (default 32; a safety cap, not a target) |
 | `--max-iterations N` | (find) scroll budget (default 20) |
 | `--no-animations` | disable device animations for the run (restored after; steps verify sooner) |
 | `--no-vision` | never send screenshots: a screen without accessibility nodes blocks (blind_screen) instead of falling back to image+box answers |
+| `--hybrid-vision` | also send a screenshot when the element list is sparse (≤3 interactive rows) and the screen stopped changing; `--no-vision` wins |
+| `--model ID` | model override for `act`/`decide` (default `jev-1.14.0`); a non-default model is never sent images — the vision fallback degrades to `blind_screen`, and `check` refuses it |
 | `--tap` | (find) tap the best match instead of just reporting it |
 | `--grep "…"` | (snapshot) print only rows containing the substring |
+| `--trace` | (act) record every step to `~/.cache/droidjev/runs/` as JSONL (goal, screen rows, typed values, answers); also `DROIDJEV_TRACE=1`; owner-only file |
 | `--json` | full machine-readable trace |
 
 Typing example: `droidjev act "search settings for battery" --text battery`.
-Goals involving typing REQUIRE `--text`; without it the tool cannot guess what
-to type (by design — no text generation). Pass one `--text` per value the goal
-names — a goal mentioning a value you did not pass ends `blocked` (the model
-will not type a wrong value into the field).
+A value the goal states is typed from the goal (no flag needed): `droidjev act
+"open maps and build a route for car from moscow to saint-petersburg"`. Pass
+`--text` for a value the goal only implies; the tool never guesses text, and a
+goal whose value can neither be read off the screen nor typed ends `blocked`.
+
+## Is it impossible? (`check`)
+
+`check` is the independent verdict: one screenshot, one jev image request, no
+actions. Use it when the screen looks terminal (an explicit "no route", "not
+available", "cannot be reached") or before giving up after `max_steps`.
+
+```bash
+droidjev check "build a route from moscow, ID to saint-petersburg, russia"
+# impossible=yes confidence=0.91 kind=no_route   (exit 2)
+# impossible=no  confidence=0.12 kind=empty_state (exit 0)
+```
+
+Only `no_route` / `unavailable` at confidence ≥ 0.7 count as impossible; an
+empty list never does. A non-default `--model` is refused (images need
+`jev-1.14.0`). The verdict is a confidence, not a quoted phrase — pair it with
+`snapshot` when the same message is in the element table.
+
+## Supervisor pattern (big model + act)
+
+Keep a larger calling model out of the per-step loop: plan once, pass the plan
+as guidance, and let jev execute.
+
+1. The big model plans the flow.
+2. `droidjev act "<full goal>" --guidance "<plan/app lore>"`.
+3. If `act` blocks or hits `max_steps`, run `droidjev check "<goal>"`.
+4. `impossible=yes` → stop; otherwise re-plan (a new `act` or a narrower
+   subgoal).
+
+Do not drive `decide` per step from the big model — that is two model round-trips
+per step and gives up the loop's speed. Use `decide` only when the caller already
+owns its observation/action pipeline.
 
 ## When it blocks
 
@@ -93,9 +133,9 @@ will not type a wrong value into the field).
   default), droidjev already drives such screens itself by screenshot — do not
   re-route them by hand unless it blocks here.
 - `blockedReason=model`: the model judged the goal unreachable with the
-  available actions (missing app, permission wall, login required, or the goal
-  names a value that was not passed via `--text` — rerun with it). Use
-  `snapshot` to see what the screen actually offers.
+  available actions (missing app, permission wall, login required, or a value
+  the goal only implies — rerun with `--text`). Use `snapshot` to see what the
+  screen actually offers.
 - `status=max_steps`: the budget ran out mid-navigation — the goal may still
   be reachable; re-issue `act` (state persists on screen), decompose the
   goal, or raise `--max-steps`.
@@ -108,13 +148,19 @@ will not type a wrong value into the field).
   harness, a web driver) can embed just the decision: `droidjev decide` reads a
   JSON request on stdin (`goal`, `elements`, `screen`, `provided_texts`,
   `apps`, `recent_actions`, `recent_choices`, `last_unchanged`, `can_scroll`,
-  `copied`, `clipboard`, `clipboard_ready`, `answers`, `today`) and answers
-  with the chosen operation, plus everything the host needs to execute it
-  without re-deriving anything: `centers` (tap points), `texts` (each row's
-  own text, for copy/answer), `drags` (the swipe a `set_*` slider stop needs)
-  and `answer` (the resolved answer text). Same element table, same questions,
-  same strict validation as `act`, no adb. Use `--serve` to keep one process
-  for a whole run.
+  `copied`, `clipboard`, `clipboard_ready`, `answers`, `today`, `guidance`)
+  and answers with the chosen operation, plus everything the host needs to
+  execute it without re-deriving anything: `centers` (tap points), `texts`
+  (each row's own text, for copy/answer), `drags` (the swipe a `set_*` slider
+  stop needs) and `answer` (the resolved answer text). Same element table,
+  same questions, same strict validation as `act`, no adb. Use `--serve` to
+  keep one process for a whole run.
+- `guidance` (array of strings) is how YOU teach droidjev the app it is
+  driving: behavior you know that a screen dump cannot show ("this camera
+  saves the video on the second shutter press", "this picker is one
+  horizontally scrolling row"). droidjev hardcodes only platform mechanics —
+  app lore belongs to the caller. Keep each entry one fact, stated as
+  behavior, never as task steps.
 - Do not call `uiautomator` by hand — UiAutomation is exclusive device-wide
   and conflicts with droidjev's resident layout server; `snapshot` already
   exposes the same data.

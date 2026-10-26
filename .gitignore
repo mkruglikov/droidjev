@@ -5,3 +5,4 @@ node_modules/
 
 # local checkout of a host harness used during development; never ships
 android_world/
+docs/superpowers/

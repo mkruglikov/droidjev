@@ -51,6 +51,10 @@ npm pack --dry-run           # inspect the npm tarball before publishing
   (operation + goal_met in parallel), executes argmax as-is, double-checks `done`.
   An empty element table diverts to the vision step: one request with a
   screenshot asset carrying a validated choice + noul gate + box tap target.
+- `src/check.js` — independent impossibility verdict: one screenshot, one jev
+  image request (`noul` explicit-statement gate + `kind` choice + evidence
+  `box`), strictly validated. Never acts; refuses a non-default model;
+  `empty_state` is never impossible.
 - `src/act.js` — executor: validated decision → adb input. Owns
   `sanitizeInputText` (the shell-inert `--text` charset). WAKE_UP rides in the
   same adb invocation as each gesture (doze-proof input).
@@ -92,8 +96,14 @@ npm pack --dry-run           # inspect the npm tarball before publishing
   to an in-bounds rectangle (docs/security.md) before code resolves them to a
   tap point; `--no-vision` disables that path. Images require the
   `TypeSafe-Danger-Zone-Images` header — sent only on vision requests.
-- `--text` values pass `sanitizeInputText`; anything outside
-  `[A-Za-z0-9 .,:+=/@%^_-]` is rejected naming the offending characters.
+- Text the model may type is operator input: `--text` values plus values the
+  goal itself names (quoted, `from X to Y`, `named/phone/email`). All pass
+  `sanitizeInputText`; an explicit value outside `[A-Za-z0-9 .,:+=/@%^_-]` is
+  rejected naming the offending characters, an untypeable goal value is dropped.
+- `check` sends exactly one screenshot through the same danger-zone image path
+  (`TypeSafe-Danger-Zone-Images`), refuses a non-default model before capture,
+  and never acts. A `no_route`/`unavailable` answer below `CHECK_CONFIDENCE`
+  (0.7), or any `empty_state`/`other` answer, is not reported impossible.
 - Every subprocess/HTTP call has a timeout; response bodies are size-capped.
 
 ## Gotchas

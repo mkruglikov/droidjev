@@ -112,7 +112,8 @@ be written in the UI's language.
 
 First layout use (`snapshot`/`find`/`act`) downloads
 appium-uiautomator2-server plus its io.appium.settings companion (~21 MB,
-three APKs) onto the emulator and starts a server that stays resident across
+three APKs, pinned release URLs verified against committed SHA-256 digests)
+onto the emulator and starts a server that stays resident across
 commands. The helper APKs are never a tap target: every element table hides
 them and their launcher icons — an icon literally labeled "Appium Settings"
 otherwise traps "open Settings" goals. Missing runtime prerequisites fail

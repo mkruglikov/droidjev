@@ -21,8 +21,11 @@ export function matchRows(table, query) {
   const partial = [];
   for (const r of table) {
     const label = (r.row.match(/"([^"]*)"/)?.[1] ?? '').toLowerCase();
+    // Internal containment metadata (`holds [13,14,15]`) is not searchable
+    // text: a query like "14" must not hit an index list.
+    const searchable = r.row.replace(/ holds \[[\d,]*\]$/, '').toLowerCase();
     if (label === q) exact.push(r);
-    else if (r.row.toLowerCase().includes(q)) partial.push(r);
+    else if (searchable.includes(q)) partial.push(r);
   }
   const pool = exact.length ? exact : partial;
   return [...pool].sort((a, b) => Number(b.el.clickable) - Number(a.el.clickable) || a.idx - b.idx);

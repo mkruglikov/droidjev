@@ -55,7 +55,7 @@ that code resolves to the tap point (`--no-vision` keeps even that off).
 
 ## Installation
 
-1. **`TYPESAFE_API_KEY`** — only `act` talks to the model.
+1. **`TYPESAFE_API_KEY`** — `act` and `check` talk to the model.
    Get a key at [docs.typesafe.ai](https://docs.typesafe.ai), then add
    `export TYPESAFE_API_KEY=…` to your shell profile.
 2. **droidjev itself** — from npm (zero deps, exactly one package), or try it
@@ -104,6 +104,9 @@ droidjev find "<label>" [--tap]  deterministically search scrollable content top
                                  no tokens); stops as soon as scrolling provably cannot help
 droidjev act "<goal>" [flags]    run the agent loop until done/blocked/answered
                                  (answers a question goal with --answer)
+droidjev check "<goal>" [flags]  one screenshot verdict: does the CURRENT screen
+                                 explicitly say the goal cannot be done? 0 = not
+                                 proven impossible, 2 = impossible (never acts)
 droidjev decide [--serve]        one decision from a JSON request on stdin (one per
                                  line with --serve), no adb: the same element table,
                                  questions and strict validation `act` uses, for a host
@@ -111,23 +114,39 @@ droidjev decide [--serve]        one decision from a JSON request on stdin (one 
                                  pipeline (a benchmark harness, a web driver)
 ```
 
-Flags: `--device SERIAL|AVD` · `--text "…"` (repeatable — one per form value, e.g.
-`--text Mary --text +79001234567` fills name and phone fields; never guessed) ·
+Flags: `--device SERIAL|AVD` · `--text "…"` (repeatable — one per form value;
+values the goal itself states — quoted strings, `from X to Y`, `named/phone/email`
+— are typed from the goal, so `--text` is only needed for a value the goal does
+not spell out; text is never guessed) ·
 `--app "Label=package"` (repeatable — an app the model may open by name in one
-step; a bare package is labelled by its last segment) · `--answer` (the goal is a
+step; a bare package is labelled by its last segment) · `--guidance "…"`
+(repeatable, act — operator/app lore for this run: a plan, an app's mechanics, a
+constraint; the model still chooses each step) · `--answer` (the goal is a
 question: offer the answer options and print the submitted answer) ·
-`--max-steps N` (act, default 12) · `--max-iterations N` (find, default 20) ·
-`--json` (full trace) · `--no-animations` (disable animations for the run;
-restored after) · `--no-vision` (never send screenshots — a screen with no
-accessibility nodes blocks instead of falling back to image+box answers).
+`--max-steps N` (act, default 32) · `--max-iterations N` (find, default 20) ·
+`--json` (full trace) · `--trace` (act: record every step to
+`~/.cache/droidjev/runs/` as JSONL — the goal, screen rows, typed values and
+answers; opt-in, also `DROIDJEV_TRACE=1`) · `--no-animations` (disable
+animations for the run; restored after) · `--no-vision` (never send
+screenshots — a screen with no accessibility nodes blocks instead of falling
+back to image+box answers) · `--hybrid-vision` (also send a screenshot when
+the element list is sparse — ≤3 interactive rows — and the screen stopped
+changing; `--no-vision` wins) · `--model ID` (act/decide model override, default
+`jev-1.14.0`; a non-default model is never sent screenshots, and `check` refuses
+one outright).
 
 Exit codes: `0` done/found · `2` not achieved — `status=blocked` with
 `blockedReason` `model` (no action sequence can reach the goal, including a
-value the goal names that was not passed via `--text`) or
+value the goal only implies and that cannot be typed) or
 `blind_screen` (the screen exposes no accessibility nodes and the vision
 fallback is off or its screenshot is unreadable), or
 `status=max_steps` (budget exhausted mid-navigation; the goal may still be
-reachable — re-run, decompose, or raise `--max-steps`) · `3` error.
+reachable — re-run, decompose, or raise `--max-steps`). `check` shares the
+codes: `0` the screen does not prove impossibility, `2` it explicitly says the
+goal cannot be done (`impossible=yes`) · `3` error —
+including `status=error` with `blockedReason=infrastructure`: a device or
+transport failure mid-run ends the episode, and the JSON still carries every
+step taken so far.
 
 ## Documentation
 
