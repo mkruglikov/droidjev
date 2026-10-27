@@ -155,7 +155,28 @@ export function buildTable(elements, screen) {
   // rows are never dropped, whatever the dump's ordering.
   const isStatusBar = (el) =>
     !!screen && CHROME_PKGS.has(el.pkg) && el.bounds && el.bounds.b <= screen.h * STATUS_BAR_FRACTION;
-  const visible = elements.filter((el, i) => !hidden.has(i) && !isStatusBar(el) && onScreen(el, screen));
+  // An open IME floods the table with its keys — 40 single-character rows
+  // crowding out the app's own. Typing is atomic here (type_, paste, digits),
+  // so the keys are never the right target. Ten or more clickable
+  // single-character labels from ANOTHER package is a keyboard, and it goes —
+  // same-package single chars are an in-app dial pad (the clock timer),
+  // which stays: its digits are exactly what a keypad goal must press.
+  const appPkg = screen?.app;
+  const imeKeys = new Set(
+    elements.filter(
+      (el) =>
+        el.clickable &&
+        el.pkg &&
+        (/inputmethod|keyboard/i.test(el.pkg) ||
+          (appPkg &&
+            el.pkg !== appPkg &&
+            /^[\w,.'"!?-]$/.test(cleanLabel(el.text) || cleanLabel(el.contentDesc) || ''))),
+    ),
+  );
+  if (imeKeys.size < 10) imeKeys.clear();
+  const visible = elements.filter(
+    (el, i) => !hidden.has(i) && !isStatusBar(el) && !imeKeys.has(el) && onScreen(el, screen),
+  );
   // A grid of same-sized unlabeled cells is drawn, not described: a calendar's
   // month, a canvas. The model cannot tell one cell from another, so tapping
   // them is guessing — and 40 of them crowd out the rows that do carry a label.
@@ -211,6 +232,17 @@ export function buildTable(elements, screen) {
     rows.push(e);
   }
   truncated = truncated || entries.length > rows.length;
+  // A container that holds several labeled rows says which ones, so the model
+  // can reason about a list or a selector without the hierarchy. A title and
+  // subtitle inside a preference row is two, not a list: three items, or a
+  // scrollable container with two.
+  for (const r of rows) {
+    if (!r.el.bounds) continue;
+    const items = listItems(rows, r.idx);
+    if (items.length >= 3 || (r.el.scrollable && items.length >= 2)) {
+      r.row += ` holds [${items.map((i) => i.idx).join(',')}]`;
+    }
+  }
   Object.defineProperty(rows, 'truncated', { value: truncated, enumerable: false });
   Object.defineProperty(rows, 'grid', { value: grid, enumerable: false });
   return rows;
@@ -227,14 +259,21 @@ export function serializeRows(table) {
 // keys). The innermost holder wins: a page contains the picker contains the
 // focused cell, and the picker is what has to move. Otherwise the largest
 // scrollable's center, else the screen middle.
-export function scrollAnchor(table, screen) {
+// The scrollable a gesture must move: the innermost one holding the focus,
+// else the largest. Exposed as the ROW so a host can size its swipe from the
+// element's own bounds; scrollAnchor wraps it as a point.
+export function scrollAnchorRow(table) {
   const focused = table.find((r) => r.el.focused && r.el.bounds);
   const scrollables = table.filter((r) => r.el.scrollable && r.el.bounds);
   const holders = focused ? scrollables.filter((r) => contains(r.el.bounds, focused.el.bounds)) : [];
   const area = (r) => (r.el.bounds.r - r.el.bounds.l) * (r.el.bounds.b - r.el.bounds.t);
   const smallest = holders.reduce((a, b) => (a === null || area(b) < area(a) ? b : a), null);
   const largest = scrollables.reduce((a, b) => (a === null || area(b) > area(a) ? b : a), null);
-  const chosen = smallest ?? largest;
+  return smallest ?? largest ?? null;
+}
+
+export function scrollAnchor(table, screen) {
+  const chosen = scrollAnchorRow(table);
   return chosen ? centerOf(chosen.el) : { x: Math.round(screen.w / 2), y: Math.round(screen.h / 2) };
 }
 

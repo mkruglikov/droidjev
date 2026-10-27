@@ -11,6 +11,7 @@
 | **typical act step** | **~1.2 s** (default) / ~1.1 s (`--no-animations`) |
 | "open Settings" from home | **~5.3 s** (default) / ~4.6–5.7 s (`--no-animations`, path-dependent) |
 | `find` in a long list | ~0.6 s per iteration, no tokens |
+| vision fallback step (blind screen only) | screenshot + downscale ~0.2–0.5 s, request larger/slower (image tokens) |
 
 The hot loop never shells to the `android` CLI (fixed ~670 ms startup tax);
 input and device discovery go through raw `adb`. Layout dumps come from one

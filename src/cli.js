@@ -3,13 +3,15 @@
 import { adbDevices, avdName, isEmulatorSerial } from './adb.js';
 import { ensureDevice, wakeAndUnlock, withAnimationsOff } from './boot.js';
 import { serializeRows } from './elements.js';
-import { runGoal } from './agent.js';
+import { runGoal, goalTexts } from './agent.js';
 import { decide, serveDecide } from './decide.js';
+import { runCheck, formatCheck, checkExitCode } from './check.js';
 import { takeSnapshot } from './snapshot.js';
 import { findLabel } from './find.js';
 import { startApp } from './start.js';
 import { ensure as ensureUia2 } from './uia2.js';
-import { requireApiKey } from './typesafe.js';
+import { requireApiKey, DEFAULT_MODEL } from './typesafe.js';
+import { openTrace } from './trace.js';
 import { run, DroidJevError, redact } from './util.js';
 import { readFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -19,7 +21,8 @@ const VERSION = JSON.parse(
   readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'),
 ).version;
 
-const USAGE = `droidjev ${VERSION} — fast jev-powered Android emulator clicker (no screenshots)
+const USAGE = `droidjev ${VERSION} — fast jev-powered Android emulator clicker (text-first;
+a screenshot is sent only for a blind screen or a \`check\` verdict)
 
 usage: droidjev <command> [args] [flags]
 
@@ -31,6 +34,10 @@ commands:
   find "<label>" [flags]     deterministically search scrollable content for a
                              label (snap → match → scroll), optionally tapping it
   act "<goal>" [flags]       run the agent loop until the goal is achieved
+  check "<goal>" [flags]     judge whether the CURRENT screen explicitly says the
+                             goal cannot be done (one screenshot, jev image): exits
+                             0 when it might still be done, 2 when the screen proves
+                             it impossible. It never acts.
   decide [--serve]           one decision for a caller-supplied state: reads a JSON
                              request on stdin (goal, screen, elements, recent_actions,
                              provided_texts, can_scroll, clipboard, answers) and prints
@@ -45,31 +52,57 @@ flags:
                              emulator, else auto-boot the first AVD)
   --text "..."               value to type when the goal needs typing (never
                              guessed); repeat for multi-field forms — one --text
-                             per value, the model matches each to its field
+                             per value, the model matches each to its field.
+                             Values the goal itself names are typed without it.
+  --guidance "..."           (act) operator/app lore for this run: a plan, an
+                             app's mechanics, a constraint; repeatable. The
+                             model still chooses each step.
   --app "Label=package"      an app the model may open by name in one step
                              ("--app Settings=com.android.settings"); repeat for
                              more. A bare package name is labelled by its last
                              segment. The model still chooses which one the goal
                              means — this only makes opening it cost one step.
-  --max-steps N              action budget for act (default 12)
+  --max-steps N              action budget for act (default 32)
   --max-iterations N         (find) scroll budget (default 20)
   --tap                      (find) tap the best match instead of just reporting it
   --answer                   (act) the goal is a question: offer the answer_ options
                              and report the submitted answer instead of stopping at
                              done
+  --no-vision                (act) never send screenshots: a screen with no
+                             accessibility nodes blocks (blind_screen) instead of
+                             falling back to image+box answers
+  --hybrid-vision            (act) also send a screenshot when the element list
+                             is sparse (≤3 interactive rows) and the screen
+                             refused to change; --no-vision still wins
+  --model ID                 (act/decide) model override (default jev-1.14.0);
+                             a non-default model is never sent images — the
+                             vision fallback degrades to blind_screen. check
+                             refuses a non-default model outright
   --grep "..."               (snapshot) print only rows containing the substring
   --json                     machine-readable output
+  --trace                    (act) record every step to ~/.cache/droidjev/runs/
+                             as JSONL (goal, screen rows, typed values, answers);
+                             also DROIDJEV_TRACE=1. Owner-only file (0600)
   --no-animations            disable window/transition animations for the run
                              (restored after) — screens settle in ~1 frame, so
                              steps verify sooner
 
-env: TYPESAFE_API_KEY (required for act and decide)
+env: TYPESAFE_API_KEY (required for act, check and decide)
 
 exit codes: 0 done, 2 blocked, 3 error
              (decide exits 0 with the decision on stdout; done/blocked come back as
               choices in the JSON, not as exit codes)`;
 
-const VALUE_FLAGS = new Set(['--device', '--text', '--app', '--max-steps', '--grep', '--max-iterations']);
+const VALUE_FLAGS = new Set([
+  '--device',
+  '--text',
+  '--app',
+  '--guidance',
+  '--max-steps',
+  '--grep',
+  '--max-iterations',
+  '--model',
+]);
 
 // One --app value: "Label=package", or a bare package labelled by its last
 // segment (com.android.settings → "settings").
@@ -95,7 +128,9 @@ export function parseArgs(argv) {
       if (a === '--device') flags.device = v;
       else if (a === '--text') (flags.texts ??= []).push(v);
       else if (a === '--app') (flags.apps ??= []).push(parseApp(v));
+      else if (a === '--guidance') (flags.guidance ??= []).push(v);
       else if (a === '--grep') flags.grep = v;
+      else if (a === '--model') flags.model = v;
       else if (a === '--max-iterations') {
         const n = Number(v);
         if (!Number.isInteger(n) || n < 1 || n > 50) {
@@ -113,6 +148,9 @@ export function parseArgs(argv) {
     else if (a === '--serve') flags.serve = true;
     else if (a === '--tap') flags.tap = true;
     else if (a === '--answer') flags.answer = true;
+    else if (a === '--trace') flags.trace = true;
+    else if (a === '--no-vision') flags.noVision = true;
+    else if (a === '--hybrid-vision') flags.hybridVision = true;
     else if (a === '--no-animations') flags.noAnimations = true;
     else if (a === '--help' || a === '-h') flags.help = true;
     else if (a.startsWith('--')) throw new DroidJevError(`unknown flag: ${a}`);
@@ -120,6 +158,10 @@ export function parseArgs(argv) {
   }
   return flags;
 }
+
+// Only an explicit "1" enables tracing: "0"/"false" are what an operator
+// writes to turn a feature OFF, and a trace writes screen text to disk.
+export const envTrace = (v) => v === '1';
 
 // The uia2 server is kept resident across droidjev invocations: booting it
 // costs ~1.2s, so every command ensures it as its first device-side step and
@@ -243,18 +285,26 @@ async function cmdAct(flags) {
   await wakeAndUnlock(serial); // display may have dozed since boot
   // Animations run by default; --no-animations zeroes them for the run and
   // restores them after, so settled screens arrive ~1 frame after an action.
+  const trace = openTrace({ enabled: !!(flags.trace || envTrace(process.env.DROIDJEV_TRACE)), goal, serial });
+  if (trace) console.error(`# trace: ${trace.file}`);
   const runIt = () =>
     runGoal({
       serial,
       goal,
       texts: flags.texts ?? null,
       apps: flags.apps ?? null,
-      maxSteps: flags.maxSteps || 12,
+      maxSteps: flags.maxSteps || 32,
+      guidance: flags.guidance ?? [],
       animationsOff: !!flags.noAnimations,
       answers: !!flags.answer,
+      vision: !flags.noVision,
+      hybridVision: !flags.noVision && !!flags.hybridVision,
+      model: flags.model ?? null,
       log: (m) => console.error(`# ${m}`),
+      trace,
     });
   const res = await withUia2(serial, () => (flags.noAnimations ? withAnimationsOff(serial, runIt) : runIt()));
+  trace?.recordResult(res);
   if (flags.json) {
     console.log(JSON.stringify(res, null, 2));
   } else {
@@ -265,7 +315,26 @@ async function cmdAct(flags) {
     );
     if (res.answer !== null) console.log(`answer: ${res.answer}`);
   }
+  if (res.status === 'error') return 3;
   return res.status === 'done' || res.status === 'answered' ? 0 : 2;
+}
+
+async function cmdCheck(flags) {
+  const goal = flags._[1];
+  if (!goal) throw new DroidJevError('check needs a goal, e.g. droidjev check "build a route from A to B"');
+  const { serial, notices } = await ensureDevice({ device: flags.device });
+  for (const n of notices) console.error(`# ${n}`);
+  await wakeAndUnlock(serial);
+  const res = await runCheck({
+    serial,
+    goal,
+    values: goalTexts(goal),
+    model: flags.model ?? DEFAULT_MODEL,
+    log: (m) => console.error(`# ${m}`),
+  });
+  if (flags.json) console.log(JSON.stringify(res, null, 2));
+  else console.log(formatCheck(res));
+  return checkExitCode(res);
 }
 
 async function cmdDecide(flags) {
@@ -281,7 +350,7 @@ async function cmdDecide(flags) {
   } catch (e) {
     throw new DroidJevError(`decide needs a JSON request on stdin (${redact(e.message)})`);
   }
-  const res = await decide(request);
+  const res = await decide({ ...request, model: request.model ?? flags.model ?? null });
   console.log(JSON.stringify(res, null, 2));
   return 0;
 }
@@ -298,7 +367,7 @@ async function preflight(cmd) {
   if (r.code !== 0 && !r.stdout.includes('Android Debug Bridge')) {
     throw new DroidJevError('"adb" is not usable — install Android platform-tools and ensure adb is in PATH');
   }
-  if (cmd === 'act') {
+  if (cmd === 'act' || cmd === 'check') {
     await requireApiKey(); // throws a clear message when TYPESAFE_API_KEY is missing
   }
 }
@@ -333,6 +402,8 @@ async function main() {
       return await cmdStart(flags);
     case 'act':
       return await cmdAct(flags);
+    case 'check':
+      return await cmdCheck(flags);
     case 'decide':
       return await cmdDecide(flags);
     default:

@@ -36,7 +36,9 @@ export function installHint(file) {
 
 // Run a file with an argument array. Resolves with {code, stdout, stderr};
 // never throws on non-zero exit (callers decide), only on spawn/timeout failure.
-export function run(file, args, { timeoutMs = 15000, maxBytes = 32 * 1024 * 1024 } = {}) {
+// binary: true keeps stdout a Buffer (utf8 decoding would mangle raw bytes —
+// the one escape hatch is for `adb exec-out` capture).
+export function run(file, args, { timeoutMs = 15000, maxBytes = 32 * 1024 * 1024, binary = false } = {}) {
   return new Promise((resolve, reject) => {
     if (typeof file !== 'string' || !Array.isArray(args) || args.some((a) => typeof a !== 'string')) {
       reject(new DroidJevError(`internal: run() requires a file and a string[] args array`));
@@ -74,9 +76,10 @@ export function run(file, args, { timeoutMs = 15000, maxBytes = 32 * 1024 * 1024
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      const stdoutBuf = Buffer.concat(out);
       resolve({
         code,
-        stdout: Buffer.concat(out).toString('utf8'),
+        stdout: binary ? stdoutBuf : stdoutBuf.toString('utf8'),
         stderr: Buffer.concat(err).toString('utf8'),
       });
     });

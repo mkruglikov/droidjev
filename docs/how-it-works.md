@@ -18,10 +18,23 @@ be written in the UI's language.
         └────────────── next dump verifies the action ◄───────────────┘
 ```
 
-- **No screenshots.** The model consumes a compact, numbered element table
-  built from the accessibility view hierarchy. It never sees pixels, and it
-  never produces coordinates, selectors, or commands — only an index into our
-  table, which code resolves to a tap position.
+- **Text first; pixels only as a last resort.** The model consumes a compact,
+  numbered element table built from the accessibility view hierarchy. It never
+  sees pixels — until the table is empty (WebView content, canvas renderers),
+  when the **vision fallback** takes over: `adb exec-out screencap` raw RGBA is
+  downscaled (pure stdlib, no image dependency) into TypeSafe's image limits,
+  encoded as a minimal PNG, and sent as an image asset to jev 1.14 with one
+  request asking three parallel questions — an `operation` choice
+  (`tap_box`/scroll/back/home/wait/done/blocked), a `noul` gate ("is a
+  rendered screen visible at all?" — a box answer comes back even when nothing
+  is, so the gate decides) and a `box` question naming the element to tap.
+  Box edges are validated 0–1 fractions forming an in-bounds rectangle, which
+  code resolves to the tap point; below the confidence floor (0.6, the docs'
+  example value) the tap is withheld and the step is recorded as a no-op so
+  the next decision can pick another route. `--no-vision` keeps the old
+  behavior (an empty table blocks with `blind_screen`). Screenshots leave the
+  machine only on this path — and they carry whatever the screen shows, the
+  same privacy surface as the element table's text plus pixels.
 - **One decision per step.** A single request asks `operation` — with
   `click_<idx>`/`hold_<idx>`/`type_<idx>_<k>`/`copy_<idx>`/`answer_<idx>` options
   for concrete elements offered alongside `launch_<k>` (an app the host can open
@@ -99,7 +112,8 @@ be written in the UI's language.
 
 First layout use (`snapshot`/`find`/`act`) downloads
 appium-uiautomator2-server plus its io.appium.settings companion (~21 MB,
-three APKs) onto the emulator and starts a server that stays resident across
+three APKs, pinned release URLs verified against committed SHA-256 digests)
+onto the emulator and starts a server that stays resident across
 commands. The helper APKs are never a tap target: every element table hides
 them and their launcher icons — an icon literally labeled "Appium Settings"
 otherwise traps "open Settings" goals. Missing runtime prerequisites fail

@@ -42,6 +42,13 @@ export async function shellOk(serial, args, opts) {
   return r;
 }
 
+// `adb -s S exec-out ...` — binary-clean stdout (raw protocol, no PTY, so no
+// CRLF translation). Device-side stderr merges into the same stream on
+// failure; binary callers must validate the payload length, not parse it.
+export function execOut(serial, args, opts) {
+  return run(ADB, ['-s', serial, 'exec-out', ...args], { timeoutMs: 15000, ...opts, binary: true });
+}
+
 export async function getprop(serial, prop) {
   const r = await shell(serial, ['getprop', prop], { timeoutMs: 8000 });
   return r.stdout.trim();

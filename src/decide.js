@@ -7,7 +7,18 @@
 // in and one JSON answer out. Nothing here touches adb: the caller supplies the
 // element list and executes whatever action comes back.
 import { buildTable, serializeRows, elementText, isSlider } from './elements.js';
-import { buildQuestions, elementsNote, scrollOffered, answerFor, sliderStops, askDecision } from './agent.js';
+import {
+  buildQuestions,
+  elementsNote,
+  scrollOffered,
+  answerFor,
+  sliderStops,
+  keypadSequence,
+  goalTable,
+  goalFields,
+  askDecision,
+} from './agent.js';
+import { scrollAnchor, scrollAnchorRow } from './elements.js';
 import { slideGesture } from './act.js';
 import { ask } from './typesafe.js';
 import { DroidJevError } from './util.js';
@@ -29,6 +40,7 @@ export function buildDecideRequest({
   recent_choices = [],
   last_unchanged = null,
   today = null,
+  guidance = null,
 }) {
   if (!goal || typeof goal !== 'string') {
     throw new DroidJevError('decide needs a goal string');
@@ -55,8 +67,10 @@ export function buildDecideRequest({
     answers,
     clipboard,
     recentChoices: recent_choices,
+    recentActions: Array.isArray(recent_actions) ? recent_actions : [],
     lastUnchanged: last_unchanged,
     today,
+    guidance: Array.isArray(guidance) ? guidance.filter(String) : guidance ? [guidance] : [],
   });
   if (!clipboard) {
     // The host has no clipboard operation: offering copy_/paste would invite a
@@ -85,13 +99,14 @@ export function buildDecideRequest({
   const sourceOf = new Map(elements.map((el, i) => [el, i]));
   const sources = Object.fromEntries(table.map((r) => [r.idx, sourceOf.get(r.el) ?? null]));
   const centers = Object.fromEntries(table.map((r) => [r.idx, r.el.center ?? null]));
-  return { state, questions, table, sources, centers };
+  return { state, questions, table, sources, centers, screen };
 }
 
 // askFn is injectable so tests can drive the whole path without the network.
 export async function decide(request, { askFn = ask, log = () => {} } = {}) {
-  const { state, questions, table, sources, centers } = buildDecideRequest(request);
-  const { operation, goalMet, usage, latencyMs, retried } = await askDecision({ state, questions, askFn, log });
+  const { state, questions, table, sources, centers, screen } = buildDecideRequest(request);
+  const decided = await askDecision({ state, questions, askFn, log, model: request.model ?? null });
+  const { operation, goalMet, usage, latencyMs, retried } = decided;
   const values = Array.isArray(request.provided_texts)
     ? request.provided_texts
     : request.provided_texts
@@ -108,6 +123,20 @@ export async function decide(request, { askFn = ask, log = () => {} } = {}) {
   return {
     operation,
     goal_met: goalMet,
+    done_verify: decided.doneVerify ?? null,
+    keypad_sequence: keypadSequence(request.goal),
+    // The goal's own table (header + rows), for a host that executes
+    // add_row_<k>: column names tell it which field each cell belongs in.
+    goal_table: goalTable(request.goal),
+    goal_fields: goalFields(request.goal),
+    // Where a scroll must swipe: the innermost scrollable holding the focus,
+    // else the largest one, with its bounds so the host sizes the gesture. A
+    // screen-center swipe lands on whatever floats there (an open keyboard),
+    // not on the list the goal needs moved.
+    scroll_anchor: (() => {
+      const row = scrollAnchorRow(table);
+      return row ? { bounds: row.el.bounds, center: scrollAnchor(table, screen) } : null;
+    })(),
     criteria: Object.keys(questions.operation.criteria),
     rows: serializeRows(table),
     sources,

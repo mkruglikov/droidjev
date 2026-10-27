@@ -1,12 +1,13 @@
 # AGENTS.md — droidjev
 
 Zero-dependency Node.js ≥ 20 CLI (ESM, `"type": "module"`) that automates
-Android emulators without screenshots: dumps the view hierarchy via a resident
+Android emulators text-first: dumps the view hierarchy via a resident
 appium-uiautomator2-server, asks the TypeSafe jev model which indexed element
-advances the goal, taps it via `adb`, verifies the screen changed. Do not add
-npm dependencies or a `package-lock.json`; stdlib only. Published to npm as
-`droidjev` (`npm i -g droidjev` / `npx droidjev`) — releases go through CI,
-see Releasing.
+advances the goal, taps it via `adb`, verifies the screen changed. Screenshots
+are sent to the model only as a blind-screen fallback (see `src/shot.js`). Do
+not add npm dependencies or a `package-lock.json`; stdlib only. Published to
+npm as `droidjev` (`npm i -g droidjev` / `npx droidjev`) — releases go through
+CI, see Releasing.
 
 ## Commands
 
@@ -48,6 +49,12 @@ npm pack --dry-run           # inspect the npm tarball before publishing
   parsing, dispatch, `bootstrap()` with the main-module guard.
 - `src/agent.js` — the `act` goal loop: builds the single per-step question
   (operation + goal_met in parallel), executes argmax as-is, double-checks `done`.
+  An empty element table diverts to the vision step: one request with a
+  screenshot asset carrying a validated choice + noul gate + box tap target.
+- `src/check.js` — independent impossibility verdict: one screenshot, one jev
+  image request (`noul` explicit-statement gate + `kind` choice + evidence
+  `box`), strictly validated. Never acts; refuses a non-default model;
+  `empty_state` is never impossible.
 - `src/act.js` — executor: validated decision → adb input. Owns
   `sanitizeInputText` (the shell-inert `--text` charset). WAKE_UP rides in the
   same adb invocation as each gesture (doze-proof input).
@@ -59,8 +66,13 @@ npm pack --dry-run           # inspect the npm tarball before publishing
 - `src/adb.js` — thin adb wrapper; `src/boot.js` — device pick, AVD boot,
   wake/unlock, `withAnimationsOff`; `src/find.js` — deterministic label search;
   `src/start.js` — launch by package; `src/snapshot.js` — table print.
-- `src/typesafe.js` — API key handling + strict response validation.
-- `src/util.js` — `run()` spawner, `DroidJevError`, `redact()`. Shared floor for
+- `src/typesafe.js` — API key handling + strict response validation (choice,
+  noul, box). Model is pinned to `jev-1.14.0` (box/images are 1.14-only).
+- `src/shot.js` — vision-fallback capture: raw `adb exec-out screencap`
+  (RGBA, 12/16-byte header detected by payload length) → box-average
+  downscale into TypeSafe's image limits → minimal stdlib PNG encode.
+- `src/util.js` — `run()` spawner (argument arrays; `binary: true` keeps
+  stdout a Buffer), `DroidJevError`, `redact()`. Shared floor for
   the security rules below; import from here, don't reimplement.
 - `test/unit.test.mjs` (offline), `test/e2e.test.mjs` (opt-in, see Commands).
 - `skill/SKILL.md` — source of the installable agent skill; keep in sync with
@@ -78,9 +90,20 @@ npm pack --dry-run           # inspect the npm tarball before publishing
 - Model answers are strictly validated in `typesafe.js` (choice ∈ offered
   options, probability sums, argmax consistency); an invalid answer executes
   **no action**. The model never produces coordinates/selectors/commands — only
-  an index into our element table, resolved to a tap position in code.
-- `--text` values pass `sanitizeInputText`; anything outside
-  `[A-Za-z0-9 .,:+=/@%^_-]` is rejected naming the offending characters.
+  an index into our element table, resolved to a tap position in code. The one
+  exception: on a blind screen (empty table) the vision fallback sends a
+  downscaled screenshot and the box answer's four 0–1 fractions are validated
+  to an in-bounds rectangle (docs/security.md) before code resolves them to a
+  tap point; `--no-vision` disables that path. Images require the
+  `TypeSafe-Danger-Zone-Images` header — sent only on vision requests.
+- Text the model may type is operator input: `--text` values plus values the
+  goal itself names (quoted, `from X to Y`, `named/phone/email`). All pass
+  `sanitizeInputText`; an explicit value outside `[A-Za-z0-9 .,:+=/@%^_-]` is
+  rejected naming the offending characters, an untypeable goal value is dropped.
+- `check` sends exactly one screenshot through the same danger-zone image path
+  (`TypeSafe-Danger-Zone-Images`), refuses a non-default model before capture,
+  and never acts. A `no_route`/`unavailable` answer below `CHECK_CONFIDENCE`
+  (0.7), or any `empty_state`/`other` answer, is not reported impossible.
 - Every subprocess/HTTP call has a timeout; response bodies are size-capped.
 
 ## Gotchas
@@ -96,6 +119,10 @@ npm pack --dry-run           # inspect the npm tarball before publishing
   re-dump entirely (`copy_<idx>`/`paste` ops).
 - `find` scrolls top-down only; it stops as soon as scrolling provably cannot
   help, and retries once after waking before declaring end-of-list.
+- Vision fallback is jev-1.14-only (`box`) and blind-screens-only; a failed
+  screenshot pipeline degrades to `blocked:blind_screen`, never to an error.
+  Two blind screens hash identically (both tables are empty), so vision steps
+  cannot rely on the hash for change detection.
 - `src/cli.js` is the npm `bin` target: keep the `#!/usr/bin/env node` shebang
   and the main-module guard with `realpathSync(process.argv[1])` — Node
   realpaths module URLs but not argv[1], so the bare comparison silently

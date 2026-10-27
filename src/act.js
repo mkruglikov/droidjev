@@ -1,6 +1,7 @@
 // Executor: turns a validated decision into adb input. All taps come from
-// coordinates computed in code from our own element table — the model never
-// produces coordinates, selectors, or commands.
+// coordinates computed in code — from our element table, or in the vision
+// fallback (agent.js) from a strictly validated box of 0-1 fractions. The
+// model never produces raw coordinates, selectors, or commands.
 import { shellOk } from './adb.js';
 import { DroidJevError } from './util.js';
 
@@ -111,6 +112,22 @@ export async function typeText(serial, text) {
     // no keycombination support; append remains usable
   }
   await shellOk(serial, ['input', 'text', safe], { timeoutMs: 10000 });
+}
+
+// Keypad digits in ONE adb invocation: every KEYCODE_0..9 token is
+// code-generated (the `;` join is the same contract as AWAKE), and one shell
+// call per digit is pure overhead.
+export function digitsArgs(seq) {
+  const args = [...AWAKE];
+  [...String(seq)].forEach((d, i) => {
+    if (i > 0) args.push(';');
+    args.push('input', 'keyevent', String(7 + Number(d)));
+  });
+  return args;
+}
+
+export async function typeDigits(serial, seq) {
+  await shellOk(serial, digitsArgs(seq), { timeoutMs: 15000 });
 }
 
 // paste (279) rides the focused field; callers must focus one first (tap).

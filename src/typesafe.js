@@ -5,9 +5,21 @@
 //   validation failure nothing downstream executes
 import { DroidJevError, redact, sleep, run } from './util.js';
 
+// A malformed model answer is routine, not fatal: a caller may retry the same
+// request once. Lives here so every validator consumer shares one predicate.
+export const isValidationError = (e) => e instanceof DroidJevError && e.message.startsWith('invalid typesafe answer');
+
 const API_URL = 'https://api.typesafe.ai/v1/systemone';
-const MODEL = 'jev-latest';
-const RETRY_STATUS = new Set([429, 529, 503]);
+// Pinned, not jev-latest: the box primitive and image assets are 1.14-only
+// (jev-latest still resolves to 1.13.0 at the time of writing), and 1.14's
+// multilingual gains feed the cross-locale matching the prompts rely on.
+// --model is an explicit operator escape hatch; vision refuses non-default
+// models because only 1.14+ answers the box primitive.
+export const DEFAULT_MODEL = 'jev-1.14.0';
+// 451 joins the set: the region-block flap lasts minutes, and the retried
+// final error ("typesafe api failed after N attempts: typesafe api 451") is
+// what the benchmark adapter's transport-retry ladder keys on.
+const RETRY_STATUS = new Set([429, 529, 503, 451]);
 const MAX_ATTEMPTS = 3;
 
 let cachedKey = null;
@@ -94,10 +106,12 @@ export function prewarm() {
   return fetch(API_URL, { method: 'HEAD' }).catch(() => {});
 }
 
-// One request with N parallel questions. Returns {answers, usage, latencyMs}.
-export async function ask({ state, questions, timeoutMs = 20000 }) {
+// One request with N parallel questions. `assets` carries image assets; any
+// such request must send the danger-zone images header (400 otherwise).
+// Returns {answers, usage, latencyMs}.
+export async function ask({ state, questions, assets = null, timeoutMs = 20000, model = DEFAULT_MODEL }) {
   const key = await requireApiKey();
-  const body = JSON.stringify({ model: MODEL, state, questions });
+  const body = JSON.stringify({ model, state, questions, ...(assets && { assets }) });
   let lastErr = null;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     if (attempt > 0) await sleep(500 * 2 ** (attempt - 1));
@@ -110,7 +124,11 @@ export async function ask({ state, questions, timeoutMs = 20000 }) {
       try {
         res = await fetch(API_URL, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+          headers: {
+            Authorization: `Bearer ${key}`,
+            'Content-Type': 'application/json',
+            ...(assets && { 'TypeSafe-Danger-Zone-Images': 'true' }),
+          },
           body,
           signal: ctrl.signal,
         });
@@ -138,7 +156,7 @@ export async function ask({ state, questions, timeoutMs = 20000 }) {
       return {
         answers: json.answers,
         usage: json.usage ?? null,
-        model: json.model ?? MODEL,
+        model: json.model ?? model,
         latencyMs: performance.now() - t0,
       };
     } catch (e) {
@@ -188,4 +206,25 @@ export function validatedNoul(answer, questionId) {
   const n = answer.noul;
   if (!Number.isFinite(n) || n < 0 || n > 1) throw bad(`noul ${n} out of range`);
   return { noul: n };
+}
+
+// The one place the model may name a position: a box answer's edges are
+// fractions of the image, validated here to a proper in-bounds rectangle
+// before code converts them to a tap point. A box answer is returned even
+// when the target is absent — the caller's noul gate decides that, not this.
+// The API schema allows confidence: null (model offered none).
+export function validatedBox(answer, questionId) {
+  const bad = (why) => new DroidJevError(`invalid typesafe answer for "${questionId}" (${why}); no action executed`);
+  if (!answer || typeof answer !== 'object') throw bad('missing answer');
+  const { box } = answer;
+  if (!box || typeof box !== 'object') throw bad('missing box');
+  for (const [edge, v] of Object.entries({ top: box.top, bottom: box.bottom, left: box.left, right: box.right })) {
+    if (!Number.isFinite(v) || v < 0 || v > 1) throw bad(`edge ${edge}=${String(v)} out of range`);
+  }
+  if (!(box.left < box.right) || !(box.top < box.bottom)) throw bad('edges do not form a rectangle');
+  const conf = answer.confidence;
+  if (conf !== null && conf !== undefined && (!Number.isFinite(conf) || conf < 0 || conf > 1)) {
+    throw bad(`confidence ${String(conf)} out of range`);
+  }
+  return { box: { top: box.top, bottom: box.bottom, left: box.left, right: box.right }, confidence: conf ?? null };
 }
