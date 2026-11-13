@@ -277,7 +277,7 @@ type Layout struct {
 	RootPkg  string
 }
 
-// uia2Source is the seam Task 13 replaces with uia2.Source. Keeping it a
+// uia2Source is the seam uia2.go wires to Source in its init. Keeping it a
 // package-level var lets this file compile and its tests run without a device.
 var uia2Source = func(serial string) (string, error) {
 	return "", NewDroidJevError("uia2 source is not wired yet")
