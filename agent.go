@@ -1075,6 +1075,25 @@ func StuckOps(recent []string, lastUnchanged *string) *OrdSet {
 // is how the episode tests run with no network.
 type AskFn func(AskRequest) (*AskResult, error)
 
+// decisionState is the state one decision is asked from: its goal (the done
+// checker decomposes it) and a copy carrying the verification note (the JS
+// object spread). AgentState is the act loop's state; DecideState is the host
+// protocol's, which has no requirements/navigation.
+type decisionState interface {
+	decisionGoal() string
+	withVerificationNote(note string) decisionState
+}
+
+// decisionGoal implements decisionState.
+func (s AgentState) decisionGoal() string { return s.Goal }
+
+// withVerificationNote implements decisionState: the note trails the state's
+// stable keys, exactly where the JS spread appends it.
+func (s AgentState) withVerificationNote(note string) decisionState {
+	s.VerificationNote = &note
+	return s
+}
+
 // NavigationEntry is one app in the episode's history (the state.navigation
 // key: the run's app changes, not every step).
 type NavigationEntry struct {
@@ -1142,7 +1161,7 @@ type Decision struct {
 
 // AskDecisionOpts is askDecision's argument.
 type AskDecisionOpts struct {
-	State     AgentState
+	State     decisionState
 	Questions Questions
 	AskFn     AskFn
 	Log       func(string)
@@ -1154,7 +1173,7 @@ type AskDecisionOpts struct {
 // answer degrades the step to a synthetic wait. criteria == nil derives the
 // offered ids from questions.Operation.Criteria (the blocked-retry and the
 // rejected-done re-ask pass their narrowed set explicitly).
-func AskValidated(askFn AskFn, state AgentState, questions Questions, criteria []string, log func(string), model string) (validated, error) {
+func AskValidated(askFn AskFn, state decisionState, questions Questions, criteria []string, log func(string), model string) (validated, error) {
 	if askFn == nil {
 		askFn = Ask
 	}
@@ -1264,8 +1283,8 @@ func questionsWithoutDone(q Questions, note string) (Questions, []string) {
 // answered from — the narrowed blocked-retry set included, so a blocked-retry
 // done is checked too. A missing, malformed, or absent verdict counts as
 // unmet: the skeptic's default, never the model's benefit.
-func verifyDone(current validated, state AgentState, questions Questions, askFn AskFn, model string, log func(string), usage *Usage, latencyMs int64, retried bool) (Decision, error) {
-	requirements := GoalRequirements(state.Goal)
+func verifyDone(current validated, state decisionState, questions Questions, askFn AskFn, model string, log func(string), usage *Usage, latencyMs int64, retried bool) (Decision, error) {
+	requirements := GoalRequirements(state.decisionGoal())
 	check, err := askFn(AskRequest{State: state, Questions: BuildVerifyQuestions(requirements), Model: model})
 	if err != nil {
 		return Decision{}, err
@@ -1308,8 +1327,7 @@ func verifyDone(current validated, state AgentState, questions Questions, askFn 
 	log("done rejected — unmet: " + strings.Join(short, "; "))
 	note := UnmetNote(unmet)
 	redoQuestions, redoKeys := questionsWithoutDone(questions, note)
-	redoState := state
-	redoState.VerificationNote = &note
+	redoState := state.withVerificationNote(note)
 	redo, err := AskValidated(askFn, redoState, redoQuestions, redoKeys, log, model)
 	if err != nil {
 		return Decision{}, err

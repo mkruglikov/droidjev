@@ -57,17 +57,18 @@ type GridInfo struct {
 }
 
 // GoalTableResult is GoalTable's parsed pipe table: the header row when one
-// was recognized (nil otherwise) and one cell slice per data row.
+// was recognized (nil otherwise, which the decide protocol renders as JSON
+// null) and one cell slice per data row (never null: an empty table is []).
 type GoalTableResult struct {
-	Header []string
-	Rows   [][]string
+	Header []string   `json:"header"`
+	Rows   [][]string `json:"rows"`
 }
 
 // GoalField is one labeled value a goal states in quotes; Label names the
 // form field it belongs in.
 type GoalField struct {
-	Label string
-	Value string
+	Label string `json:"label"`
+	Value string `json:"value"`
 }
 
 // Skill is one macro: ID names it, Anchor places its options in the criteria
