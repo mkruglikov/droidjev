@@ -1,0 +1,33 @@
+{
+  "operation": {
+    "type": "choice",
+    "instructions": {
+      "question": "The element list is sparse: only a few native rows are readable (app or browser chrome). The screenshot in state.screenshot IS the screen here — judge the target from what is visible in it. Pick the single next action that best advances the goal.",
+      "rules": [
+        "tap_box taps the on-screen element the tap_target answer marks — a link, a button, a field, an image acting as a control. Judge by what is VISIBLE in the screenshot, matching the goal by meaning (the goal and the page may be in different languages).",
+        "scroll_down/scroll_up move the page when the target is probably just out of view; back leaves this page for the one before it; home returns to the launcher, whose element list is readable again.",
+        "Choose done only when the screenshot itself shows the goal achieved.",
+        "Choose blocked only when nothing on this screen can lead to the goal.",
+        "Guidance from the operator: The account menu is behind the avatar in the top right."
+      ]
+    },
+    "criteria": {
+      "tap_box": "Tap the element the tap_target box marks — the visible control that best advances the goal",
+      "scroll_down": "Scroll down — the target is probably further down the page",
+      "scroll_up": "Scroll up — the target is probably higher on the page",
+      "back": "Leave this page for the one before it",
+      "home": "Return to the home screen",
+      "wait": "The page is still loading; act next step",
+      "done": "The goal is already achieved, as shown in the screenshot",
+      "blocked": "No action on this screen can achieve the goal"
+    }
+  },
+  "screen_readable": {
+    "type": "noul",
+    "instructions": "Does the screenshot in state.screenshot show a rendered screen with content (text, controls, images) rather than a blank, black or off display?"
+  },
+  "tap_target": {
+    "type": "box",
+    "instructions": "The single element in `9b2f1c7e-5d4a-4f6e-8a1b-2c3d4e5f6a7b` to tap next to advance the goal (this answer is used only when the operation choice is tap_box)"
+  }
+}
