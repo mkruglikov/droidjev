@@ -1,12 +1,12 @@
 // Layout: the UI hierarchy dump from the resident appium-uiautomator2-server.
 // A dump is one adb-forwarded HTTP call; the server is installed on first use
-// and kept resident across commands (Task 13 wires the HTTP half).
+// and kept resident across commands.
 //
-// Ported from src/layout.js. The tokenizer is hand-written on purpose: the
-// server's XML is machine-generated and mostly attribute-only, and the Node
-// port tolerates shapes encoding/xml rejects (a literal '>' inside a quoted
-// attribute, unknown class-named tags, mismatched close tags). Keep it byte
-// compatible with the JS scanner.
+// Ported from the Node implementation. The tokenizer is hand-written on
+// purpose: the server's XML is machine-generated and mostly attribute-only,
+// and the original tolerated shapes encoding/xml rejects (a literal '>' inside
+// a quoted attribute, unknown class-named tags, mismatched close tags). Keep
+// it byte compatible with the original scanner.
 
 package main
 

@@ -1,7 +1,7 @@
 // Live-emulator end-to-end scenarios for the act loop. Opt-in: they spend
 // real TypeSafe tokens and need a booted emulator (plus Chrome for the paste
 // scenario). Run with: DROIDJEV_E2E=1 go test -run TestE2E -v .
-// Ported from test/e2e.test.mjs (frozen), assertions unchanged.
+// Ported from the frozen Node e2e suite, assertions unchanged.
 
 package main
 

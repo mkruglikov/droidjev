@@ -1,9 +1,9 @@
 // Deterministic app launch by package: resolve the launcher activity, start
 // it; fall back to monkey. Launching an app is not a judgment problem either.
 //
-// Ported from src/start.js; the package-name validation, the component
-// preference, the monkey fallback, and the focus polling timings are kept
-// exact.
+// Ported from the Node implementation; the package-name validation, the
+// component preference, the monkey fallback, and the focus polling timings are
+// kept exact.
 
 package main
 

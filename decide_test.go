@@ -1,4 +1,4 @@
-// Ports unit.test.mjs's decide section and the decide goldens: the host-facing
+// Ports the Node tests' decide section and the decide goldens: the host-facing
 // single decision, no device.
 
 package main

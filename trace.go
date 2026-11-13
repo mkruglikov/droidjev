@@ -4,9 +4,9 @@
 // screen text, typed values and answers. The file is created 0o600 and is
 // never written inside the repo.
 //
-// Ported from src/trace.js: the header/step/result shapes, the millisecond
-// stamp plus random suffix, the slug, and the disable-on-error-once behavior
-// are kept exact.
+// Ported from the Node implementation: the header/step/result shapes, the
+// millisecond stamp plus random suffix, the slug, and the
+// disable-on-error-once behavior are kept exact.
 
 package main
 
@@ -42,7 +42,7 @@ type Trace struct {
 // TraceStep is the recordStep argument: the exact per-step inputs, the
 // questions sent, the effective answers, the criteria key order, the executed
 // record, and the table hash. Kind == "vision" writes the reduced vision shape
-// (kind + record only), as src/trace.js does.
+// (kind + record only), as the original did.
 type TraceStep struct {
 	Step           int
 	Kind           string
@@ -112,7 +112,8 @@ func (t *Trace) RecordStep(rec TraceStep) {
 	t.write(fields)
 }
 
-// RecordResult writes the episode result, picking the fields src/trace.js picks
+// RecordResult writes the episode result, picking the fields the original
+// picked
 // (`status`, `blockedReason`, `tookMs`, `tokens`). Map membership is the
 // "defined" test: a present nil value is written as JSON null, a missing one is
 // omitted.

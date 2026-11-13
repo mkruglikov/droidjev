@@ -1,4 +1,4 @@
-// Ports the trace cases from test/unit.test.mjs (src/trace.js is frozen): a
+// Ports the trace cases from the frozen Node implementation: a
 // traced episode is one 0600 JSONL file per run, every line passes through
 // Redact, and a trace that cannot write disables itself with one notice
 // instead of failing the episode.

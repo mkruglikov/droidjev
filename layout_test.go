@@ -1,6 +1,6 @@
-// Parser tests ported from test/unit.test.mjs's layout section. The XML
-// fixtures are the same strings the Node tests use: machine-generated uia2
-// output (v10 class-named nested tags, optional attrs omitted, entities).
+// Parser tests ported from the Node implementation's layout section. The XML
+// fixtures are the same strings the original tests used: machine-generated
+// uia2 output (v10 class-named nested tags, optional attrs omitted, entities).
 
 package main
 
@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// sampleXML is SAMPLE_XML from unit.test.mjs: nested class-named tags with
+// sampleXML is SAMPLE_XML from the Node tests: nested class-named tags with
 // entities and a clickable row.
 const sampleXML = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
 <hierarchy index="0" class="hierarchy" rotation="0" width="1344" height="2992">
@@ -24,7 +24,7 @@ const sampleXML = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
   </android.widget.FrameLayout>
 </hierarchy>`
 
-// uia2XML is UIA2_XML from unit.test.mjs: the appium uiautomator2-server v10
+// uia2XML is UIA2_XML from the Node tests: the appium uiautomator2-server v10
 // shape, mixing self-closing tags with explicit close tags.
 const uia2XML = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
 <hierarchy index="0" class="hierarchy" rotation="0" width="1344" height="2992">

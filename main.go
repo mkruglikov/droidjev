@@ -1,7 +1,7 @@
 // Command droidjev is a fast jev-powered Android emulator clicker, text-first:
 // it dumps the view hierarchy and taps the element that advances the goal.
-// Ported from src/cli.js; messages, JSON shapes and exit codes are kept word
-// for word.
+// Ported from the Node implementation; messages, JSON shapes and exit codes
+// are kept word for word.
 package main
 
 import (

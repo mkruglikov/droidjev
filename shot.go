@@ -2,8 +2,9 @@
 // bytes → downscaled RGB → PNG, sent to TypeSafe as an image asset only when the
 // view hierarchy is empty.
 //
-// Ported from src/shot.js. The PNG is stdlib image/png: validity and dimensions
-// are the contract, not byte-equality with node:zlib.
+// Ported from the Node implementation. The PNG is stdlib image/png: validity
+// and dimensions are the contract, not byte-equality with the original
+// encoder.
 
 package main
 

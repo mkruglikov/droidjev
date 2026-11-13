@@ -12,11 +12,11 @@ advances the goal, taps it via adb, and verifies the screen changed — all in
 one CLI invocation. A typical 2-step goal finishes in ~6s. A powered-off
 emulator is fine: it auto-boots the first AVD (adds ~30–60s).
 
-**How to invoke:** run the `droidjev` binary from the repo if it is on PATH
-(`droidjev …`), otherwise `node <repo>/droidjev …` with the DroidJev
-repository path. Requires Node.js ≥ 20, `adb`, the `android` CLI on PATH, and
-`TYPESAFE_API_KEY` in the environment. Missing prerequisites produce a clear
-warning and stop — fix what they name, do not work around them.
+**How to invoke:** run the `droidjev` binary if it is on PATH (`droidjev …`);
+from a checkout without installing, run `go run . …` with the DroidJev
+repository as the working directory. Requires `adb`, the `android` CLI on
+PATH, and `TYPESAFE_API_KEY` in the environment. Missing prerequisites produce
+a clear warning and stop — fix what they name, do not work around them.
 
 ## Preferred usage: ONE act call with the full flow
 

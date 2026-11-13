@@ -1,7 +1,7 @@
 // The goal loop's decision tests: the ask/verify/retry policy, the vision
-// step, and offline episodes driven through the IO seam. Ported from
-// test/unit.test.mjs's runGoal section — the stubs replace every device call,
-// so no emulator and no network are involved.
+// step, and offline episodes driven through the IO seam. Ported from the Node
+// implementation's runGoal section — the stubs replace every device call, so
+// no emulator and no network are involved.
 
 package main
 

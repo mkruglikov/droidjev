@@ -144,9 +144,9 @@ func TestSanitizeSpaceEscape(t *testing.T) {
 	}
 }
 
-// Numbers ported from src/act.js: the track midpoint is x1, the target is
-// l + fraction*(r-l), and the extremes overshoot the track by 40px so the
-// value clamps to min/max. Duration is always 400ms.
+// Numbers ported from the Node implementation: the track midpoint is x1, the
+// target is l + fraction*(r-l), and the extremes overshoot the track by 40px
+// so the value clamps to min/max. Duration is always 400ms.
 func TestSlideGesture(t *testing.T) {
 	el := &Element{Bounds: &Bounds{L: 100, T: 500, R: 700, B: 560}}
 	cases := []struct {
@@ -266,7 +266,7 @@ func TestTapLongPressSlideArgv(t *testing.T) {
 }
 
 // keyevent is the one call with no AWAKE prefix (back/home/paste input is
-// forwarded as-is, as src/act.js does).
+// forwarded as-is, as the original did).
 func TestKeyEventArgv(t *testing.T) {
 	read := recordAdb(t)
 	serial := "emulator-5554"

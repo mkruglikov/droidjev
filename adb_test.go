@@ -8,10 +8,10 @@ import (
 	"testing"
 )
 
-// Ports the `adb devices -l` parse from src/adb.js (frozen): the header line is
-// dropped, the state alternatives are tried in JS order, and `model:` is picked
-// out of the trailing attribute list. A missing model is the empty string (the
-// Node code's null).
+// Ports the `adb devices -l` parse from the frozen Node implementation: the
+// header line is dropped, the state alternatives are tried in JS order, and
+// `model:` is picked out of the trailing attribute list. A missing model is
+// the empty string (the original's null).
 func TestAdbDevicesParse(t *testing.T) {
 	stdout := "List of devices attached\n" +
 		"emulator-5554\tdevice product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1\n" +
@@ -62,7 +62,7 @@ func TestIsEmulatorSerial(t *testing.T) {
 	}
 }
 
-// parseWmSize mirrors src/adb.js's screenSize: Override (the active display
+// parseWmSize mirrors the original's screenSize: Override (the active display
 // resolution) beats Physical, and neither means no screen.
 func TestScreenSizeParse(t *testing.T) {
 	cases := []struct {
@@ -86,7 +86,7 @@ func TestScreenSizeParse(t *testing.T) {
 	}
 }
 
-// parseCurrentFocus mirrors src/adb.js's currentApp: take the mCurrentFocus
+// parseCurrentFocus mirrors the original's currentApp: take the mCurrentFocus
 // line, then the first package/activity component on it.
 func TestCurrentAppParse(t *testing.T) {
 	cases := []struct {

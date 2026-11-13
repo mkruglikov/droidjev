@@ -1,4 +1,4 @@
-// Ports the parseResolveActivity case from test/unit.test.mjs: `cmd package
+// Ports the parseResolveActivity case from the Node implementation: `cmd package
 // resolve-activity --brief` may print an apk path line before the component,
 // and the component is the last package/activity-looking line.
 package main

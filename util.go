@@ -3,7 +3,7 @@
 // - every subprocess has a timeout and bounded output collection
 // - anything headed for logs/errors passes through Redact
 //
-// Ported from src/util.js; messages are kept word for word.
+// Ported from the Node implementation; messages are kept word for word.
 
 package main
 
@@ -70,7 +70,7 @@ func Redact(s string) string {
 }
 
 // installHints are the human-readable install hints for missing external
-// tools, word for word from src/util.js.
+// tools, word for word from the Node implementation.
 var installHints = map[string]string{
 	"adb":     "\"adb\" is not installed or not in PATH — install Android platform-tools:\n  https://developer.android.com/tools/releases/platform-tools",
 	"android": "the \"android\" CLI is not installed or not in PATH — install it:\n  https://developer.android.com/cli/install\n(only auto-booting an AVD needs it; pass --device to target a running emulator)",

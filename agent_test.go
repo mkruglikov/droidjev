@@ -1,6 +1,6 @@
-// Question-builder tests, ported from test/unit.test.mjs, plus the prompt
+// Question-builder tests ported from the Node implementation, plus the prompt
 // parity gate: every golden in testdata/golden/ is rebuilt here and compared
-// byte for byte with the Node implementation's output.
+// byte for byte with the original output.
 
 package main
 

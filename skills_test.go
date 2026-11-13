@@ -1,5 +1,5 @@
-// Goal parsers and macro-registry tests, ported from test/unit.test.mjs (the
-// keypadSequence / goalTable / goalTexts cases plus the skills-registry
+// Goal parsers and macro-registry tests, ported from the Node implementation
+// (the keypadSequence / goalTable / goalTexts cases plus the skills-registry
 // characterization goldens' expected keys and descriptions). The two RE2
 // emulations — the `^0+(?=\d)` lookahead and the route pattern's terminator
 // lookahead — are exercised directly.

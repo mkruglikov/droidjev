@@ -3,8 +3,8 @@
 // fallback) from a strictly validated box of 0-1 fractions. The model never
 // produces raw coordinates, selectors, or commands.
 //
-// Ported from src/act.js: wire shapes, gesture math, messages, and the typed
-// text charset are kept exact.
+// Ported from the Node implementation: wire shapes, gesture math, messages,
+// and the typed text charset are kept exact.
 
 package main
 
@@ -14,8 +14,8 @@ import (
 	"strings"
 )
 
-// KEYS from src/act.js. paste (279) rides the focused field, so callers must
-// focus one first (a tap).
+// KEYS from the Node implementation. paste (279) rides the focused field, so
+// callers must focus one first (a tap).
 const (
 	KeyBack  = 4
 	KeyHome  = 3
@@ -24,8 +24,8 @@ const (
 	KeyPaste = 279
 )
 
-// Swipe is one `input swipe` gesture. The JSON tags match slideGesture's
-// object in src/act.js, which decide's drags replay verbatim.
+// Swipe is one `input swipe` gesture. The JSON tags match the original's
+// slideGesture object, which decide's drags replay verbatim.
 type Swipe struct {
 	X1         int `json:"x1"`
 	Y1         int `json:"y1"`
@@ -141,8 +141,8 @@ func LongPress(serial string, c Point, holdMs int) error {
 	return swipe(serial, Swipe{X1: c.X, Y1: c.Y, X2: c.X, Y2: c.Y, DurationMs: holdMs})
 }
 
-// KeyEvent sends one key event as-is: no WAKE_UP prefix, matching src/act.js
-// (back/home/paste are forwarded straight through).
+// KeyEvent sends one key event as-is: no WAKE_UP prefix, matching the
+// original (back/home/paste are forwarded straight through).
 func KeyEvent(serial string, code int) error {
 	_, err := ShellOk(serial, []string{"input", "keyevent", strconv.Itoa(code)}, RunOpts{TimeoutMs: 8000})
 	return err

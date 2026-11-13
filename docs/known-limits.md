@@ -10,6 +10,10 @@
   mis-taps on dense pages.
 - Typing is ASCII-only (see the `--text` charset in the
   [security model](security.md)); no IME/emoji.
+- Label truncation cuts at a UTF-16 boundary. When an astral character (an
+  emoji or similar) straddles the cut, the whole character is dropped instead
+  of leaving half a surrogate pair (the Node implementation kept the lone
+  surrogate).
 - A locked emulator with a PIN stays blocked (wake + MENU only dismisses a
   non-secure keyguard).
 - `find` scrolls top-down only; run it from the top of a list for labels that

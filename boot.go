@@ -2,8 +2,8 @@
 // auto-boot the first AVD when nothing is online. The `android` CLI is fine
 // here (cold path); the per-step hot loop stays adb-only.
 //
-// Ported from src/boot.js; every notice string, wait, timeout, and error
-// message is kept word for word.
+// Ported from the Node implementation; every notice string, wait, timeout, and
+// error message is kept word for word.
 
 package main
 

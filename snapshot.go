@@ -1,7 +1,7 @@
 // One-screen capture shared by snapshot/find/act: screen size + focused app +
 // layout dump + element table.
 //
-// Ported from src/snapshot.js.
+// Ported from the Node implementation.
 
 package main
 

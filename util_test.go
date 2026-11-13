@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// Ports unit.test.mjs's redact cases (single- and multi-line bearer values)
+// Ports the Node tests' redact cases (single- and multi-line bearer values)
 // and pins the JS regex /Bearer\s+[\s\S]*?(?="|$)/gi behavior exactly: the
 // match runs from "Bearer" plus its whitespace to the next `"` or the end of
 // the string, the replacement is always capitalized, and everything else is

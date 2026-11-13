@@ -1,6 +1,6 @@
-// Ports the pinHostGpuIni cases from test/unit.test.mjs (src/boot.js is
-// frozen): an AVD with hw.gpu.enabled = no renders on the CPU and starves the
-// host, so the config.ini text is repinned to the host GPU.
+// Ports the pinHostGpuIni cases from the frozen Node implementation: an AVD
+// with hw.gpu.enabled = no renders on the CPU and starves the host, so the
+// config.ini text is repinned to the host GPU.
 package main
 
 import "testing"

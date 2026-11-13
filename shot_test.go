@@ -20,8 +20,8 @@ func screencapHeader(w, h, format int, words int) []byte {
 	return b[:words*4]
 }
 
-// Ports the parseScreencap test from test/unit.test.mjs: the header size is
-// identified by the total payload length, not by a magic or version field.
+// Ports the parseScreencap test from the Node implementation: the header size
+// is identified by the total payload length, not by a magic or version field.
 func TestParseScreencap(t *testing.T) {
 	px := bytes.Repeat([]byte{0xaa}, 2*2*4)
 

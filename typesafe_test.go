@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-// Ports the typesafe section of test/unit.test.mjs — the security tests the
+// Ports the typesafe section of the Node tests — the security tests the
 // design mandates: model answers are only ever an index into our own options,
 // and every malformed answer is rejected before anything executes.
 

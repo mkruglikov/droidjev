@@ -2,8 +2,8 @@
 // should see, give them stable indices, and serialize compact rows. The model
 // only ever sees rows like `[12] click "About phone"` — never coordinates.
 //
-// Ported from src/elements.js. JS's non-enumerable array props (`truncated`,
-// `grid`) live on Table here.
+// Ported from the Node implementation. JS's non-enumerable array props
+// (`truncated`, `grid`) live on Table here.
 
 package main
 

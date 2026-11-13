@@ -7,9 +7,10 @@
 // in and one JSON answer out. Nothing here touches adb: the caller supplies the
 // element list and executes whatever action comes back.
 //
-// Ported from src/decide.js. `ServeDecide` is the long-lived mode: one JSON
-// request per line on stdin, one JSON answer per line on stdout, because forking
-// a process per decision is what deadlocks under a threaded host.
+// Ported from the Node implementation. `ServeDecide` is the long-lived mode:
+// one JSON request per line on stdin, one JSON answer per line on stdout,
+// because forking a process per decision is what deadlocks under a threaded
+// host.
 
 package main
 

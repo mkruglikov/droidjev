@@ -2,8 +2,8 @@
 // a shell. The hot loop must never shell out to the `android` CLI (~670ms
 // startup tax); adb is ~14ms per call.
 //
-// Ported from src/adb.js; the call timeouts and the regexes (including JS `\s`,
-// spelled with JSWhitespaceClass) are kept exact.
+// Ported from the Node implementation; the call timeouts and the regexes
+// (including JS `\s`, spelled with JSWhitespaceClass) are kept exact.
 
 package main
 

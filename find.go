@@ -2,8 +2,9 @@
 // (tap | scroll) → repeat. No model calls — a long alphabetized list is a code
 // problem, not a judgment problem.
 //
-// Ported from src/find.js: ranking, the hash-stall wake-and-retry-once, the 60%
-// scroll, the 600ms settle, and both stop reasons are kept exact.
+// Ported from the Node implementation: ranking, the hash-stall
+// wake-and-retry-once, the 60% scroll, the 600ms settle, and both stop reasons
+// are kept exact.
 
 package main
 

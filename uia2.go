@@ -12,9 +12,10 @@
 // it lives, the android CLI's own layout commands stay displaced — Stop (also
 // used internally for restarts) hands UiAutomation back.
 //
-// Ported from src/uia2.js; messages are kept word for word. Unlike the JS
-// event loop, Go callers can be concurrent, so the session/ensured maps are
-// mutex-guarded (fields of a returned *Session are only mutated under it).
+// Ported from the Node implementation; messages are kept word for word.
+// Unlike the original event loop, Go callers can be concurrent, so the
+// session/ensured maps are mutex-guarded (fields of a returned *Session are
+// only mutated under it).
 package main
 
 import (
@@ -200,7 +201,7 @@ type PinnedSet struct {
 	Assets PinnedAssets
 }
 
-// Pinned is copied verbatim from src/uia2.js.
+// Pinned is copied verbatim from the Node implementation.
 var Pinned = PinnedSet{
 	Tag: PinnedTags{Server: "v10.6.6", Settings: "v8.2.1"},
 	Assets: PinnedAssets{

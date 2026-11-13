@@ -5,8 +5,8 @@
 //   - responses are strictly validated before any answer is trusted; on any
 //     validation failure nothing downstream executes
 //
-// Ported from src/typesafe.js: wire shapes, retry policy, byte caps, and every
-// error message are kept word for word.
+// Ported from the Node implementation: wire shapes, retry policy, byte caps,
+// and every error message are kept word for word.
 
 package main
 
@@ -114,7 +114,7 @@ func RequireApiKey() (string, error) {
 }
 
 // Asset is one image asset carried by a request. JSON field names match the
-// wire shape built in src/check.js / src/agent.js.
+// wire shape the act and check vision paths build.
 type Asset struct {
 	Type       string `json:"type"`
 	Format     string `json:"format"`
