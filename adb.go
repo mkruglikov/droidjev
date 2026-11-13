@@ -24,9 +24,12 @@ type Device struct {
 	Model  string
 }
 
-// Screen is a display resolution in px.
+// Screen is a display resolution in px. App is the focused window's package
+// when the caller knows it (snapshot merges CurrentApp into the screen); the
+// table builder uses it to tell an IME's foreign keys from an in-app dial pad.
 type Screen struct {
 	W, H int
+	App  string
 }
 
 // FocusedApp is the package/activity component of the focused window.
