@@ -1,12 +1,12 @@
-// The goal loop's pure half: the prompt builders. One layout dump + one
-// TypeSafe request per step; the model answers a single `operation` choice
-// whose options include click_<idx> / type_<idx>_<k> / copy_<idx> for concrete
-// elements (plus scroll/back/home/paste/wait/done/blocked) alongside a
-// parallel `goal_met` judgment.
+// The goal loop: the prompt builders (part 1) and the decision flow (part 2).
+// One layout dump + one TypeSafe request per step; the model answers a single
+// `operation` choice whose options include click_<idx> / type_<idx>_<k> /
+// copy_<idx> for concrete elements (plus scroll/back/home/paste/wait/done/
+// blocked) alongside a parallel `goal_met` judgment.
 //
-// Ported from src/agent.js lines 1-937. Prompt parity is the mandate: every
-// rule string is copied verbatim and criteria are built into *OrdMap in the
-// exact JS insertion order, because criteria key order IS prompt order.
+// Ported from src/agent.js. Prompt parity is the mandate: every rule string is
+// copied verbatim and criteria are built into *OrdMap in the exact JS
+// insertion order, because criteria key order IS prompt order.
 //
 // Section map:
 //   - constants and fixed operations
@@ -14,16 +14,22 @@
 //   - BuildQuestions and its rule assembly
 //   - goal requirements and BuildVerifyQuestions
 //   - the vision fallback: BuildVisionQuestions, VisionVerdict, BuildVisionState
-//
-// Task 16 appends the decision flow and the goal loop to this file.
+//   - the decision flow: askValidated, verifyDone, AskDecision, AskVisionVerdict
+//   - the goal loop: IO/DefaultIO, visionStep, RunGoal
 
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"math"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // --- constants (JS: MAX_ROWS_NOTE, MAX_COPY_CHARS, BLOCKED_RETRY_CONFIDENCE,
@@ -49,8 +55,8 @@ const TapBoxMinConfidence = 0.6
 
 // SyntheticWait is the schema-complete no-op a step degrades to after two
 // invalid answers (JS SYNTHETIC_WAIT). Hosts index probabilities exactly like
-// a real answer's.
-var SyntheticWait = Choice{Choice: "wait", Probabilities: map[string]float64{"wait": 1}}
+// a real answer's; Synthetic says where it came from.
+var SyntheticWait = Choice{Choice: "wait", Probabilities: map[string]float64{"wait": 1}, Synthetic: true}
 
 // maxVerifyRequirements caps the done-checker's decomposition.
 const maxVerifyRequirements = 8
@@ -897,12 +903,22 @@ func LowInfoVision(t *Table, unchangedRun int) bool {
 // images too).
 func EffectiveVision(vision bool) bool { return vision }
 
-// StepRecord is one executed step as the prompts see it. Changed is nil until
-// the step's screen settles (the JS `changed: null`).
+// StepRecord is one executed step as the prompts, the operator, and a trace
+// see it. Field order and null-vs-omitted semantics match the JS step objects
+// exactly: Choice is nil for a withheld vision step, Changed is nil until the
+// screen settles (or for a step that never touched it), and every optional key
+// is omitted where the JS object had no such property.
 type StepRecord struct {
-	Step    int
-	Action  string
-	Changed *bool
+	Step        int      `json:"step"`
+	Choice      *string  `json:"choice"`
+	Action      string   `json:"action"`
+	Changed     *bool    `json:"changed"`
+	APIMs       int64    `json:"apiMs"`
+	ActMs       *int64   `json:"actMs,omitempty"`
+	Confidence  *float64 `json:"confidence,omitempty"`
+	GoalMetNoul *float64 `json:"goalMetNoul,omitempty"`
+	StagedText  *string  `json:"stagedText,omitempty"`
+	Answer      *string  `json:"answer,omitempty"`
 }
 
 // VisionStateInput is BuildVisionState's argument: the goal, the provided
@@ -1051,4 +1067,1637 @@ func StuckOps(recent []string, lastUnchanged *string) *OrdSet {
 		stuck.Add(unchanged)
 	}
 	return stuck
+}
+
+// --- the decision flow: ask, verify, retry ----------------------------------
+
+// AskFn is the model seam. Production is Ask; tests substitute a stub, which
+// is how the episode tests run with no network.
+type AskFn func(AskRequest) (*AskResult, error)
+
+// NavigationEntry is one app in the episode's history (the state.navigation
+// key: the run's app changes, not every step).
+type NavigationEntry struct {
+	App  string `json:"app"`
+	Step int    `json:"step"`
+}
+
+// AgentStateScreen is the state's screen block.
+type AgentStateScreen struct {
+	App      string  `json:"app"`
+	Size     *string `json:"size"`
+	Launcher bool    `json:"launcher,omitempty"`
+}
+
+// AgentState is the per-step state block sent to the model. Field order IS JSON
+// key order: the stable keys lead, the volatile history trails, and
+// verification_note is last (the JS object literal order). SeenBefore and
+// VerificationNote are omitted when unset — the JS `|| undefined`.
+type AgentState struct {
+	Goal             string            `json:"goal"`
+	ProvidedTexts    []string          `json:"provided_texts"`
+	Today            *string           `json:"today"`
+	Screen           AgentStateScreen  `json:"screen"`
+	Elements         []string          `json:"elements"`
+	ElementsNote     string            `json:"elements_note"`
+	Requirements     []string          `json:"requirements"`
+	SeenBefore       bool              `json:"seen_before,omitempty"`
+	Navigation       []NavigationEntry `json:"navigation"`
+	RecentActions    []string          `json:"recent_actions"`
+	VerificationNote *string           `json:"verification_note,omitempty"`
+}
+
+// validated is one ask's effective answers plus the criteria they were
+// validated against, so a trace records exactly what was executed.
+type validated struct {
+	Operation     Choice
+	GoalMet       Noul
+	Answers       map[string]json.RawMessage
+	Criteria      []string
+	Usage         *Usage
+	LatencyMs     int64
+	InvalidAnswer bool
+}
+
+// DoneVerify is the done-checker's verdict on a claim: the requirements the
+// skeptic found without evidence.
+type DoneVerify struct {
+	Unmet []string `json:"unmet"`
+}
+
+// Decision is one step's validated decision. Retried marks the blocked-retry
+// path, InvalidAnswer any discarded malformed answer, and DoneVerify the
+// rejected requirements (nil when the done was verified or none was claimed).
+type Decision struct {
+	Operation     Choice
+	GoalMet       Noul
+	Answers       map[string]json.RawMessage
+	Criteria      []string
+	Usage         *Usage
+	LatencyMs     int64
+	Retried       bool
+	InvalidAnswer bool
+	DoneVerify    *DoneVerify
+}
+
+// AskDecisionOpts is askDecision's argument.
+type AskDecisionOpts struct {
+	State     AgentState
+	Questions Questions
+	AskFn     AskFn
+	Log       func(string)
+	Model     string
+}
+
+// AskValidated is one ask with the invalid-answer retry policy applied: a
+// malformed model answer is routine, so ask once more, and a second invalid
+// answer degrades the step to a synthetic wait. criteria == nil derives the
+// offered ids from questions.Operation.Criteria (the blocked-retry and the
+// rejected-done re-ask pass their narrowed set explicitly).
+func AskValidated(askFn AskFn, state AgentState, questions Questions, criteria []string, log func(string), model string) (validated, error) {
+	if askFn == nil {
+		askFn = Ask
+	}
+	if log == nil {
+		log = func(string) {}
+	}
+	keys := criteria
+	if keys == nil {
+		keys = questions.Operation.Criteria.Keys()
+	}
+	for attempt := 0; ; attempt++ {
+		res, err := askFn(AskRequest{State: state, Questions: questions, Model: model})
+		if err != nil {
+			return validated{}, err
+		}
+		if res == nil {
+			return validated{}, NewDroidJevError("typesafe ask returned no result")
+		}
+		op, verr := ValidatedChoice(res.Answers["operation"], keys, "operation")
+		var goalMet Noul
+		if verr == nil {
+			goalMet, verr = ValidatedNoul(res.Answers["goal_met"], "goal_met")
+		}
+		if verr == nil {
+			return validated{
+				Operation:     op,
+				GoalMet:       goalMet,
+				Answers:       res.Answers,
+				Criteria:      keys,
+				Usage:         res.Usage,
+				LatencyMs:     res.LatencyMs,
+				InvalidAnswer: attempt > 0,
+			}, nil
+		}
+		if !IsValidationError(verr) {
+			return validated{}, verr
+		}
+		if attempt >= 1 {
+			log("invalid model answer twice (" + verr.Error() + ") — the step degrades to wait")
+			return validated{
+				Operation:     SyntheticWait,
+				GoalMet:       Noul{Value: 0},
+				Answers:       res.Answers,
+				Criteria:      keys,
+				Usage:         res.Usage,
+				LatencyMs:     res.LatencyMs,
+				InvalidAnswer: true,
+			}, nil
+		}
+	}
+}
+
+func decisionOf(first validated, retried bool) Decision {
+	return Decision{
+		Operation:     first.Operation,
+		GoalMet:       first.GoalMet,
+		Answers:       first.Answers,
+		Criteria:      first.Criteria,
+		Usage:         first.Usage,
+		LatencyMs:     first.LatencyMs,
+		Retried:       retried,
+		InvalidAnswer: first.InvalidAnswer,
+	}
+}
+
+// UnmetNote is a rejected done's note, shared by the immediate re-ask and the
+// later steps: a requirement the model failed to meet is not forgotten next
+// step.
+func UnmetNote(unmet []string) string {
+	quoted := make([]string, len(unmet))
+	for i, u := range unmet {
+		quoted[i] = `"` + u + `"`
+	}
+	return `The last done claim failed verification. These requirements are NOT met yet: ` +
+		strings.Join(quoted, "; ") +
+		`. Address them; do not claim done until each has evidence. Before deleting or redoing anything, compare what the screen shows with the requirement: keep what already matches and fix only the difference — a value that is partially entered needs its missing part, not a restart.`
+}
+
+// ordMapWithout copies m without one key, returning the copy and its key order
+// (the criteria the narrowed ask was validated against).
+func ordMapWithout(m *OrdMap, drop string) (*OrdMap, []string) {
+	out := NewOrdMap()
+	for _, k := range m.Keys() {
+		if k == drop {
+			continue
+		}
+		v, _ := m.Get(k)
+		out.Set(k, v)
+	}
+	return out, out.Keys()
+}
+
+// questionsWithoutDone is the rejected-done re-ask: done withdrawn, the note
+// spliced onto the rules tail.
+func questionsWithoutDone(q Questions, note string) (Questions, []string) {
+	criteria, keys := ordMapWithout(q.Operation.Criteria, "done")
+	out := q
+	out.Operation.Criteria = criteria
+	rules := make([]string, len(q.Operation.Instructions.Rules), len(q.Operation.Instructions.Rules)+1)
+	copy(rules, q.Operation.Instructions.Rules)
+	out.Operation.Instructions.Rules = append(rules, note)
+	return out, keys
+}
+
+// verifyDone is the done-checker: every requirement of the goal is judged
+// before a done may end the episode. questions is the set the claim was
+// answered from — the narrowed blocked-retry set included, so a blocked-retry
+// done is checked too. A missing, malformed, or absent verdict counts as
+// unmet: the skeptic's default, never the model's benefit.
+func verifyDone(current validated, state AgentState, questions Questions, askFn AskFn, model string, log func(string), usage *Usage, latencyMs int64, retried bool) (Decision, error) {
+	requirements := GoalRequirements(state.Goal)
+	check, err := askFn(AskRequest{State: state, Questions: BuildVerifyQuestions(requirements), Model: model})
+	if err != nil {
+		return Decision{}, err
+	}
+	var answers map[string]json.RawMessage
+	var checkLatency int64
+	if check != nil {
+		answers = check.Answers
+		checkLatency = check.LatencyMs
+	}
+	unmet := make([]string, 0, len(requirements))
+	for i, req := range requirements {
+		verdict, ok := answers["req_"+strconv.Itoa(i)]
+		if !ok {
+			unmet = append(unmet, req)
+			continue
+		}
+		choice, verr := ValidatedChoice(verdict, []string{"met", "unmet"}, "req_"+strconv.Itoa(i))
+		if verr != nil || choice.Choice == "unmet" {
+			unmet = append(unmet, req)
+		}
+	}
+	accepted := Decision{
+		Operation:     current.Operation,
+		GoalMet:       current.GoalMet,
+		Answers:       current.Answers,
+		Criteria:      current.Criteria,
+		Usage:         usage,
+		LatencyMs:     latencyMs,
+		Retried:       retried,
+		InvalidAnswer: current.InvalidAnswer,
+	}
+	if len(unmet) == 0 {
+		return accepted, nil
+	}
+	short := make([]string, len(unmet))
+	for i, u := range unmet {
+		short[i] = `"` + UTF16Truncate(u, 60) + `"`
+	}
+	log("done rejected — unmet: " + strings.Join(short, "; "))
+	note := UnmetNote(unmet)
+	redoQuestions, redoKeys := questionsWithoutDone(questions, note)
+	redoState := state
+	redoState.VerificationNote = &note
+	redo, err := AskValidated(askFn, redoState, redoQuestions, redoKeys, log, model)
+	if err != nil {
+		return Decision{}, err
+	}
+	return Decision{
+		Operation:     redo.Operation,
+		GoalMet:       redo.GoalMet,
+		Answers:       redo.Answers,
+		Criteria:      redo.Criteria,
+		Usage:         redo.Usage,
+		LatencyMs:     latencyMs + checkLatency + redo.LatencyMs,
+		Retried:       true,
+		InvalidAnswer: redo.InvalidAnswer || current.InvalidAnswer,
+		DoneVerify:    &DoneVerify{Unmet: unmet},
+	}, nil
+}
+
+// AskDecision asks once and applies the retry policy. A give-up the model is
+// barely sure of (confidence < BlockedRetryConfidence) is asked again with
+// blocked off — and a done on that retry still has to pass the same
+// verification, or a low-confidence blocked is a free escape hatch.
+func AskDecision(opts AskDecisionOpts) (Decision, error) {
+	askFn := opts.AskFn
+	if askFn == nil {
+		askFn = Ask
+	}
+	logf := opts.Log
+	if logf == nil {
+		logf = func(string) {}
+	}
+	first, err := AskValidated(askFn, opts.State, opts.Questions, nil, logf, opts.Model)
+	if err != nil {
+		return Decision{}, err
+	}
+	op := first.Operation
+	if op.Choice != "blocked" || op.Confidence >= BlockedRetryConfidence {
+		if op.Choice != "done" {
+			return decisionOf(first, false), nil
+		}
+		return verifyDone(first, opts.State, opts.Questions, askFn, opts.Model, logf,
+			first.Usage, first.LatencyMs, false)
+	}
+	without, withoutKeys := ordMapWithout(opts.Questions.Operation.Criteria, "blocked")
+	blockedQuestions := opts.Questions
+	blockedQuestions.Operation.Criteria = without
+	logf("blocked at confidence " + formatFixed2(op.Confidence) + " — asking again without blocked")
+	again, err := AskValidated(askFn, opts.State, blockedQuestions, withoutKeys, logf, opts.Model)
+	if err != nil {
+		return Decision{}, err
+	}
+	if again.Operation.Choice == "done" {
+		return verifyDone(again, opts.State, blockedQuestions, askFn, opts.Model, logf,
+			again.Usage, first.LatencyMs+again.LatencyMs, true)
+	}
+	return Decision{
+		Operation:     again.Operation,
+		GoalMet:       again.GoalMet,
+		Answers:       again.Answers,
+		Criteria:      again.Criteria,
+		Usage:         again.Usage,
+		LatencyMs:     first.LatencyMs + again.LatencyMs,
+		Retried:       true,
+		InvalidAnswer: again.InvalidAnswer || first.InvalidAnswer,
+	}, nil
+}
+
+// VisionAsk is one vision request: the screenshot state, its three questions,
+// the image assets, the longer timeout, and the optional model.
+type VisionAsk struct {
+	State     VisionState
+	Questions VisionQuestions
+	Assets    map[string]Asset
+	TimeoutMs int64
+	Model     string
+}
+
+// VisionAnswer is the consumed vision response. Withheld reports two invalid
+// answers in a row: the step is skipped, never fatal.
+type VisionAnswer struct {
+	Operation      Choice
+	ScreenReadable Noul
+	TapTarget      Box
+	APIms          int64
+	Usage          *Usage
+	InvalidAnswer  bool
+	Withheld       bool
+}
+
+// AskVisionVerdict is the same retry policy for the vision step's three
+// parallel answers; a second invalid answer withholds the step instead of
+// ending the run.
+func AskVisionVerdict(askFn AskFn, req VisionAsk, log func(string)) (VisionAnswer, error) {
+	if askFn == nil {
+		askFn = Ask
+	}
+	if log == nil {
+		log = func(string) {}
+	}
+	ids := req.Questions.Operation.Criteria.Keys()
+	for attempt := 0; ; attempt++ {
+		res, err := askFn(AskRequest{
+			State:     req.State,
+			Questions: req.Questions,
+			Assets:    req.Assets,
+			TimeoutMs: req.TimeoutMs,
+			Model:     req.Model,
+		})
+		if err != nil {
+			return VisionAnswer{}, err
+		}
+		if res == nil {
+			return VisionAnswer{}, NewDroidJevError("typesafe ask returned no result")
+		}
+		op, verr := ValidatedChoice(res.Answers["operation"], ids, "operation")
+		var readable Noul
+		if verr == nil {
+			readable, verr = ValidatedNoul(res.Answers["screen_readable"], "screen_readable")
+		}
+		var target Box
+		if verr == nil {
+			target, verr = ValidatedBox(res.Answers["tap_target"], "tap_target")
+		}
+		if verr == nil {
+			return VisionAnswer{
+				Operation:      op,
+				ScreenReadable: readable,
+				TapTarget:      target,
+				APIms:          res.LatencyMs,
+				Usage:          res.Usage,
+				InvalidAnswer:  attempt > 0,
+			}, nil
+		}
+		if !IsValidationError(verr) {
+			return VisionAnswer{}, verr
+		}
+		if attempt >= 1 {
+			log("invalid vision answer twice (" + verr.Error() + ") — the step is withheld")
+			return VisionAnswer{Withheld: true, APIms: res.LatencyMs, Usage: res.Usage}, nil
+		}
+	}
+}
+
+// --- the goal loop ----------------------------------------------------------
+
+// IO is every device/network touch the goal loop makes, in one object: the
+// test seam. RunGoal merges a caller's partial overrides over DefaultIO, so a
+// nil field keeps the real implementation.
+type IO struct {
+	GetLayout     func(serial string) (*Layout, error)
+	SettleLayout  func(serial string, maxMs int64) (*Layout, error)
+	ScreenSize    func(serial string) (*Screen, error)
+	Shell         func(serial string, args []string, opts RunOpts) (RunResult, error)
+	Tap           func(serial string, c Point) error
+	LongPress     func(serial string, c Point) error
+	SlideTo       func(serial string, el *Element, fraction float64) error
+	ScrollSwipe   func(serial string, anchor Point, dy, screenH int, direction string) error
+	ScrollSwipeX  func(serial string, anchor Point, dx, screenW int, direction string) error
+	KeyEvent      func(serial string, code int) error
+	TypeText      func(serial, s string) error
+	TypeDigits    func(serial, s string) error
+	SetClipboard  func(serial, text string) error
+	StartApp      func(serial, pkg string) (StartResult, error)
+	ScreenshotPng func(serial string) (ShotResult, error)
+	Prewarm       func()
+	Sleep         func(ms int)
+	DeviceToday   func(serial string) (*string, error)
+}
+
+// DefaultIO is the real device implementation of every IO seam.
+func DefaultIO() IO {
+	return IO{
+		GetLayout:    GetLayout,
+		SettleLayout: SettleLayout,
+		ScreenSize:   ScreenSize,
+		Shell:        Shell,
+		Tap:          Tap,
+		LongPress:    func(serial string, c Point) error { return LongPress(serial, c, 0) },
+		SlideTo:      SlideTo,
+		ScrollSwipe: func(serial string, anchor Point, dy, screenH int, direction string) error {
+			return ScrollSwipe(serial, anchor, dy, screenH, direction, 0)
+		},
+		ScrollSwipeX: func(serial string, anchor Point, dx, screenW int, direction string) error {
+			return ScrollSwipeX(serial, anchor, dx, screenW, direction, 0)
+		},
+		KeyEvent:      KeyEvent,
+		TypeText:      TypeText,
+		TypeDigits:    TypeDigits,
+		SetClipboard:  SetClipboard,
+		StartApp:      StartApp,
+		ScreenshotPng: ScreenshotPng,
+		Prewarm:       Prewarm,
+		Sleep:         Sleep,
+		DeviceToday:   DeviceToday,
+	}
+}
+
+// mergeIO fills every nil field of over from base (the JS object spread over
+// the defaults, with nil standing in for an absent key).
+func mergeIO(base, over IO) IO {
+	if over.GetLayout != nil {
+		base.GetLayout = over.GetLayout
+	}
+	if over.SettleLayout != nil {
+		base.SettleLayout = over.SettleLayout
+	}
+	if over.ScreenSize != nil {
+		base.ScreenSize = over.ScreenSize
+	}
+	if over.Shell != nil {
+		base.Shell = over.Shell
+	}
+	if over.Tap != nil {
+		base.Tap = over.Tap
+	}
+	if over.LongPress != nil {
+		base.LongPress = over.LongPress
+	}
+	if over.SlideTo != nil {
+		base.SlideTo = over.SlideTo
+	}
+	if over.ScrollSwipe != nil {
+		base.ScrollSwipe = over.ScrollSwipe
+	}
+	if over.ScrollSwipeX != nil {
+		base.ScrollSwipeX = over.ScrollSwipeX
+	}
+	if over.KeyEvent != nil {
+		base.KeyEvent = over.KeyEvent
+	}
+	if over.TypeText != nil {
+		base.TypeText = over.TypeText
+	}
+	if over.TypeDigits != nil {
+		base.TypeDigits = over.TypeDigits
+	}
+	if over.SetClipboard != nil {
+		base.SetClipboard = over.SetClipboard
+	}
+	if over.StartApp != nil {
+		base.StartApp = over.StartApp
+	}
+	if over.ScreenshotPng != nil {
+		base.ScreenshotPng = over.ScreenshotPng
+	}
+	if over.Prewarm != nil {
+		base.Prewarm = over.Prewarm
+	}
+	if over.Sleep != nil {
+		base.Sleep = over.Sleep
+	}
+	if over.DeviceToday != nil {
+		base.DeviceToday = over.DeviceToday
+	}
+	return base
+}
+
+// pacing is the scroll-pacing state consecutive same-direction scrolls share:
+// each further scroll in the same direction covers more ground, a reversal
+// resets it, and the vision step reads the same object. lastScrollDir is ""
+// where the JS had null.
+type pacing struct {
+	sameDirRun    int
+	lastScrollDir string
+}
+
+// App is one --app value: the label the model sees and the package to launch.
+type App struct {
+	Label string `json:"label"`
+	Pkg   string `json:"pkg"`
+}
+
+// Tokens is the episode's token accounting (the JS `{input, output}`).
+type Tokens struct {
+	Input  float64 `json:"input"`
+	Output float64 `json:"output"`
+}
+
+// GoalResult is the episode's result, JSON-shaped exactly like the JS object:
+// key order included, and null where the JS wrote null.
+type GoalResult struct {
+	Status        string       `json:"status"`
+	BlockedReason *string      `json:"blockedReason"`
+	Goal          string       `json:"goal"`
+	Serial        string       `json:"serial"`
+	Steps         []StepRecord `json:"steps"`
+	Answer        *string      `json:"answer"`
+	Tokens        Tokens       `json:"tokens"`
+	TookMs        int64        `json:"tookMs"`
+	FinalRows     []string     `json:"finalRows"`
+	FinalApp      *string      `json:"finalApp"`
+}
+
+// GoalOpts is RunGoal's argument. Vision and HybridVision are the effective
+// flags (the CLI passes !--no-vision): a zero-value struct means no images, the
+// same convention as QuestionInputs.
+type GoalOpts struct {
+	Serial        string
+	Goal          string
+	Texts         []string
+	Apps          []App
+	MaxSteps      int
+	Guidance      []string
+	AnimationsOff bool
+	Answers       bool
+	Vision        bool
+	HybridVision  bool
+	Log           func(string)
+	AskFn         AskFn
+	IO            *IO
+	Trace         *Trace
+	Model         string
+}
+
+// DeviceToday is the device's own date: a goal about "tomorrow" is only
+// decidable against it, and the emulator's clock is not the host's. Any
+// failure is the JS null, never an error the loop has to handle.
+func DeviceToday(serial string) (*string, error) {
+	r, err := Shell(serial, []string{"date", "+%Y-%m-%d"}, RunOpts{TimeoutMs: 5000})
+	if err != nil {
+		return nil, nil
+	}
+	m := deviceDateRe.FindStringSubmatch(string(r.Stdout))
+	if m == nil {
+		return nil, nil
+	}
+	s := m[1] + "-" + m[2] + "-" + m[3]
+	return &s, nil
+}
+
+var (
+	launcherRe     = regexp.MustCompile(`(?i)launcher`)
+	deviceDateRe   = regexp.MustCompile(`(\d{4})-(\d{2})-(\d{2})`)
+	clickChoiceRe  = regexp.MustCompile(`^click_(\d+)$`)
+	typeChoiceRe   = regexp.MustCompile(`^type_(\d+)_(\d+)$`)
+	copyChoiceRe   = regexp.MustCompile(`^copy_(\d+)$`)
+	holdChoiceRe   = regexp.MustCompile(`^hold_(\d+)$`)
+	setChoiceRe    = regexp.MustCompile(`^set_(\d+)_(\w+)$`)
+	clipChoiceRe   = regexp.MustCompile(`^clip_(\d+)$`)
+	launchChoiceRe = regexp.MustCompile(`^launch_(\d+)$`)
+)
+
+// visionOutcome is one vision step's result: "" continues the loop, done/
+// blocked end it. Table/RootPkg/Hash are the post-settle state when a gesture
+// ran, and Table is nil when the screen was not touched.
+type visionOutcome struct {
+	Status        string
+	BlockedReason string
+	Record        StepRecord
+	Table         *Table
+	RootPkg       string
+	Hash          string
+}
+
+type visionStepOpts struct {
+	Serial        string
+	Step          int
+	Goal          string
+	Values        []string
+	Screen        *Screen
+	AppPkg        string
+	Steps         []StepRecord
+	DeviceDate    *string
+	Pacing        *pacing
+	AnimationsOff bool
+	PrevHash      string
+	Log           func(string)
+	AskFn         AskFn
+	IO            IO
+	Table         *Table
+	Guidance      []string
+	Model         string
+}
+
+// visionStep is one blind-screen step. The screenshot becomes the screen; the
+// noul gates, the choice directs, and the box targets. An untappable
+// screenshot pipeline degrades to the old blocked:blind_screen instead of
+// erroring — vision is a fallback, not a prerequisite.
+func visionStep(o visionStepOpts) (visionOutcome, error) {
+	shot, err := o.IO.ScreenshotPng(o.Serial)
+	if err != nil {
+		o.Log("step " + strconv.Itoa(o.Step) + ": vision fallback unavailable (" + err.Error() + ")")
+		return visionOutcome{
+			Status:        "blocked",
+			BlockedReason: "blind_screen",
+			Record: StepRecord{
+				Step: o.Step, Choice: strPtr("blocked"),
+				Action:  "blocked (screenshot capture failed on a blind screen)",
+				Changed: nil, APIMs: 0,
+			},
+		}, nil
+	}
+	// A UUID reference cannot collide with goal or row text (references are
+	// find-and-replaced as plain substrings).
+	ref := randomUUID()
+	state := BuildVisionState(VisionStateInput{
+		Goal:       o.Goal,
+		Values:     o.Values,
+		DeviceDate: o.DeviceDate,
+		Screen:     o.Screen,
+		AppPkg:     o.AppPkg,
+		Steps:      o.Steps,
+		Table:      o.Table,
+		Ref:        ref,
+	})
+	hybrid := len(tableRows(o.Table)) > 0
+	questions := BuildVisionQuestions(ref, hybrid, o.Guidance)
+	verdict0, err := AskVisionVerdict(o.AskFn, VisionAsk{
+		State:     state,
+		Questions: questions,
+		Assets: map[string]Asset{
+			ref: {Type: "image", Format: "png", DataBase64: base64.StdEncoding.EncodeToString(shot.Png)},
+		},
+		// ~1MB body + image tokens: visibly slower than the text requests the
+		// 20s default was tuned for.
+		TimeoutMs: 45000,
+		Model:     o.Model,
+	}, o.Log)
+	if err != nil {
+		return visionOutcome{}, err
+	}
+	if verdict0.Withheld {
+		o.Log("step " + strconv.Itoa(o.Step) + ": vision answers invalid twice — step withheld")
+		return visionOutcome{
+			Record: StepRecord{
+				Step: o.Step, Choice: nil,
+				Action:  "withheld (invalid model answer after retry)",
+				Changed: boolPtr(false), APIMs: verdict0.APIms,
+			},
+		}, nil
+	}
+	operation := verdict0.Operation
+	screenReadable := verdict0.ScreenReadable
+	apiMs := verdict0.APIms
+	verdict := VisionVerdict(operation, screenReadable, verdict0.TapTarget)
+
+	if verdict.Kind == "blocked" {
+		return visionOutcome{
+			Status:        "blocked",
+			BlockedReason: verdict.Reason,
+			Record: StepRecord{
+				Step: o.Step, Choice: strPtr("blocked"),
+				Action:  "blocked (vision, screen_readable=" + formatFixed2(screenReadable.Value) + ")",
+				Changed: nil, APIMs: apiMs,
+			},
+		}, nil
+	}
+	if verdict.Kind == "op" && (verdict.Choice == "done" || verdict.Choice == "blocked") {
+		reason := ""
+		if verdict.Choice == "blocked" {
+			reason = "model"
+		}
+		return visionOutcome{
+			Status:        verdict.Choice,
+			BlockedReason: reason,
+			Record: StepRecord{
+				Step: o.Step, Choice: strPtr(verdict.Choice),
+				Action:  verdict.Choice + " (vision, conf=" + formatFixed2(operation.Confidence) + ")",
+				Changed: nil, APIMs: apiMs,
+			},
+		}, nil
+	}
+	choice := verdict.Choice
+	if verdict.Kind == "tap" {
+		choice = "tap_box"
+	}
+	stepT0 := time.Now()
+	var action string
+	switch {
+	case verdict.Kind == "tap":
+		c := BoxCenter(*verdict.Box, o.Screen)
+		o.Log("step " + strconv.Itoa(o.Step) + ": vision tap " + strconv.Itoa(c.X) + "," + strconv.Itoa(c.Y) +
+			" (conf " + formatFixed2(operation.Confidence) + ")")
+		if err := o.IO.Tap(o.Serial, c); err != nil {
+			return visionOutcome{}, err
+		}
+		action = "tap (by screenshot) " + strconv.Itoa(c.X) + "," + strconv.Itoa(c.Y)
+	case verdict.Kind == "skip_tap":
+		o.Log("step " + strconv.Itoa(o.Step) + ": vision tap withheld (box confidence " +
+			formatFixed2(verdict.Confidence) + ")")
+		return visionOutcome{
+			Record: StepRecord{
+				Step: o.Step, Choice: strPtr(choice),
+				Action:  "tap withheld (box confidence " + formatFixed2(verdict.Confidence) + ")",
+				Changed: boolPtr(false), APIMs: apiMs,
+			},
+		}, nil
+	case choice == "scroll_down" || choice == "scroll_up":
+		dir := strings.TrimPrefix(choice, "scroll_")
+		if dir == o.Pacing.lastScrollDir {
+			o.Pacing.sameDirRun++
+		} else {
+			o.Pacing.sameDirRun = 0
+		}
+		o.Pacing.lastScrollDir = dir
+		w, h := 1080, 2340
+		if o.Screen != nil {
+			w, h = o.Screen.W, o.Screen.H
+		}
+		anchor := Point{X: int(math.Round(float64(w) / 2)), Y: int(math.Round(float64(h) / 2))}
+		dy := ScrollDistance(h, o.Pacing.sameDirRun)
+		if err := o.IO.ScrollSwipe(o.Serial, anchor, dy, h, dir); err != nil {
+			return visionOutcome{}, err
+		}
+		o.Log("step " + strconv.Itoa(o.Step) + ": " + choice + " by screenshot (" +
+			strconv.Itoa(int(math.Round(float64(dy)/float64(h)*100))) + "% of screen)")
+		action = choice + " (by screenshot)"
+	case choice == "back" || choice == "home":
+		code := KeyBack
+		if choice == "home" {
+			code = KeyHome
+		}
+		if err := o.IO.KeyEvent(o.Serial, code); err != nil {
+			return visionOutcome{}, err
+		}
+		o.Pacing.lastScrollDir = ""
+		action = choice
+	case choice == "wait":
+		o.IO.Sleep(700)
+		action = "wait"
+	default:
+		return visionOutcome{}, NewDroidJevError("unhandled vision operation " + choice)
+	}
+	// Same settle contract as a normal step; the settled dump is verification
+	// and the next table. ponytail: TableHash cannot tell two different blind
+	// screens apart (both hash the empty list) — the action log is the history.
+	settleMs := settleMsFor(strings.HasPrefix(choice, "scroll_"), o.AnimationsOff)
+	next, err := o.IO.SettleLayout(o.Serial, settleMs)
+	if err != nil {
+		return visionOutcome{}, err
+	}
+	nextTable := BuildTable(next.Elements, o.Screen)
+	hash := TableHash(nextTable)
+	changed := hash != o.PrevHash
+	actMs := time.Since(stepT0).Milliseconds()
+	return visionOutcome{
+		Record: StepRecord{
+			Step: o.Step, Choice: strPtr(choice), Action: action,
+			Changed: boolPtr(changed), APIMs: apiMs, ActMs: int64Ptr(actMs),
+		},
+		Table: nextTable, RootPkg: next.RootPkg, Hash: hash,
+	}, nil
+}
+
+// RunGoal is the goal loop: dump, ask, execute the validated argmax, settle,
+// repeat. A device/transport failure ends the episode as data, never a crash:
+// the steps so far are the post-mortem. Model-answer failures never get here
+// (AskDecision degrades them); a non-DroidJevError is a real bug and propagates.
+func RunGoal(opts GoalOpts) (GoalResult, error) {
+	if opts.Goal == "" {
+		return GoalResult{}, NewDroidJevError(`a goal is required, e.g. droidjev act "open Settings"`)
+	}
+	// Accept values the goal itself names too — the goal is operator input, so
+	// a full-flow act can fill a field the goal already describes. Explicit
+	// --text fails fast on an untypable value; a goal value that cannot be
+	// typed is simply not offered.
+	provided := opts.Texts
+	for _, v := range provided {
+		if _, err := SanitizeInputText(v); err != nil {
+			return GoalResult{}, err
+		}
+	}
+	values := append([]string{}, provided...)
+	for _, v := range GoalTexts(opts.Goal) {
+		dup := false
+		for _, x := range values {
+			if strings.ToLower(x) == strings.ToLower(v) {
+				dup = true
+				break
+			}
+		}
+		if dup {
+			continue
+		}
+		if _, err := SanitizeInputText(v); err != nil {
+			continue // leave it out rather than type an approximation
+		}
+		values = append(values, v)
+	}
+
+	dev := DefaultIO()
+	if opts.IO != nil {
+		dev = mergeIO(dev, *opts.IO)
+	}
+	logf := opts.Log
+	if logf == nil {
+		logf = func(string) {}
+	}
+	askFn := opts.AskFn
+	if askFn == nil {
+		askFn = Ask
+	}
+	maxSteps := opts.MaxSteps
+	if maxSteps <= 0 {
+		maxSteps = 32
+	}
+
+	t0 := time.Now()
+	// Set before the first device call: every return path — including an
+	// infrastructure failure on the very first dump — has to render.
+	tokens := Tokens{}
+	steps := []StepRecord{}
+	status := "max_steps"
+	var blockedReason *string
+	table := &Table{}
+	rootPkg := ""
+	prevHash := ""
+	copied := false // a copy_<idx> step ran this run — gates the paste op
+	pace := pacing{}
+	// Consecutive no-change steps: a screen that refuses to move is a signal
+	// the table alone cannot explain (hybrid vision asks for the pixels).
+	unchangedRun := 0
+	useVision := EffectiveVision(opts.Vision)
+	// The goal's requirements are the episode's checklist: computed once, sent
+	// every step. The rejected-done note sticks until a done is verified.
+	requirements := GoalRequirements(opts.Goal)
+	var verificationNote *string
+	// Episode memory: which tables arrived this run (seen_before) and which app
+	// changes happened (navigation).
+	seenHashes := map[string]int{}
+	nav := []NavigationEntry{}
+
+	failRun := func(e error) {
+		status = "error"
+		reason := "infrastructure"
+		blockedReason = &reason
+		steps = append(steps, StepRecord{
+			Step: len(steps) + 1, Choice: strPtr("error"),
+			Action: "error: " + e.Error(), Changed: nil, APIMs: 0,
+		})
+		logf("infrastructure failure: " + e.Error())
+	}
+
+	runErr := func() error {
+		// The first dump starts the on-device uia2 server (~1s); the key-less
+		// connection warm-up rides alongside it.
+		screen, err := dev.ScreenSize(opts.Serial)
+		if err != nil {
+			return err
+		}
+		first, err := dev.GetLayout(opts.Serial)
+		if err != nil {
+			return err
+		}
+		dev.Prewarm()
+		deviceDate, _ := dev.DeviceToday(opts.Serial)
+		// Focused app from the dump's root package — dumpsys would cost an
+		// extra adb roundtrip per step for the same answer.
+		rootPkg = first.RootPkg
+		table = BuildTable(first.Elements, screen)
+		// Retry once on an empty dump: entry animations can momentarily hide
+		// nodes. Still empty afterwards → the per-step vision fallback takes
+		// over (or, with vision off, the model sees an empty list and blocks).
+		// ponytail: one retry, 900ms.
+		if len(table.Rows) == 0 {
+			dev.Sleep(900)
+			retry, err := dev.GetLayout(opts.Serial)
+			if err != nil {
+				return err
+			}
+			rootPkg = retry.RootPkg
+			table = BuildTable(retry.Elements, screen)
+		}
+		prevHash = TableHash(table)
+		seenHashes[prevHash]++
+		nav = append(nav, NavigationEntry{App: appOrUnknown(rootPkg), Step: 0})
+
+		for step := 1; step <= maxSteps; step++ {
+			appPkg := appOrUnknown(rootPkg)
+			launcher := launcherRe.MatchString(appPkg)
+			// A blind screen (empty table) goes to the vision fallback: the
+			// screenshot becomes the screen. Without it (or --no-vision) the run
+			// keeps the old behavior — the model sees an empty list and blocks.
+			if useVision && (len(table.Rows) == 0 || (opts.HybridVision && LowInfoVision(table, unchangedRun))) {
+				// Only the pinned model is known to answer the box primitive:
+				// never send pixels to a model the operator substituted for text
+				// requests.
+				if opts.Model != "" && opts.Model != DefaultModel {
+					reason := "blind_screen"
+					blockedReason = &reason
+					status = "blocked"
+					record := StepRecord{
+						Step: step, Choice: strPtr("blocked"),
+						Action:  "blocked (blind_screen: custom model " + opts.Model + " is never sent images)",
+						Changed: nil, APIMs: 0,
+					}
+					steps = append(steps, record)
+					opts.Trace.RecordStep(TraceStep{Step: step, Kind: "vision", Record: record})
+					break
+				}
+				v, err := visionStep(visionStepOpts{
+					Serial: opts.Serial, Step: step, Goal: opts.Goal, Values: values,
+					Screen: screen, AppPkg: appPkg, Steps: steps, DeviceDate: deviceDate,
+					Pacing: &pace, AnimationsOff: opts.AnimationsOff, PrevHash: prevHash,
+					Log: logf, AskFn: askFn, IO: dev, Table: table, Guidance: opts.Guidance,
+					Model: opts.Model,
+				})
+				if err != nil {
+					return err
+				}
+				if v.Status == "done" || v.Status == "blocked" {
+					if v.Status == "blocked" {
+						reason := v.BlockedReason
+						blockedReason = &reason
+					}
+					status = v.Status
+					steps = append(steps, v.Record)
+					opts.Trace.RecordStep(TraceStep{Step: step, Kind: "vision", Record: v.Record})
+					break
+				}
+				steps = append(steps, v.Record)
+				opts.Trace.RecordStep(TraceStep{Step: step, Kind: "vision", Record: v.Record})
+				if v.Table != nil {
+					table = v.Table
+					rootPkg = v.RootPkg
+					prevHash = v.Hash
+					seenHashes[prevHash]++
+					if appOrUnknown(rootPkg) != nav[len(nav)-1].App {
+						nav = append(nav, NavigationEntry{App: appOrUnknown(rootPkg), Step: step})
+					}
+				}
+				if v.Record.Changed != nil {
+					if *v.Record.Changed {
+						logf("        → screen changed")
+					} else {
+						logf("        → no visible change")
+					}
+				}
+				continue
+			}
+
+			recentActions := recentActionsOf(steps)
+			var size *string
+			if screen != nil {
+				s := strconv.Itoa(screen.W) + "x" + strconv.Itoa(screen.H)
+				size = &s
+			}
+			state := AgentState{
+				Goal:             opts.Goal,
+				ProvidedTexts:    nilIfEmpty(values),
+				Today:            deviceDate,
+				Screen:           AgentStateScreen{App: appPkg, Size: size, Launcher: launcher},
+				Elements:         SerializeRows(table),
+				ElementsNote:     ElementsNote(table, launcher),
+				Requirements:     requirements,
+				SeenBefore:       seenHashes[prevHash] > 1,
+				Navigation:       lastNavigation(nav, 6),
+				RecentActions:    recentActions,
+				VerificationNote: verificationNote,
+			}
+			// The exact inputs the questions were built from, recorded so a
+			// replay can rebuild them.
+			var lastUnchanged *string
+			if n := len(steps); n > 0 && steps[n-1].Changed != nil && !*steps[n-1].Changed &&
+				steps[n-1].Choice != nil {
+				lastUnchanged = steps[n-1].Choice
+			}
+			var grid *GridInfo
+			if table.Grid != nil {
+				grid = &GridInfo{Size: table.Grid.Size, Count: len(table.Grid.Cells)}
+			}
+			questionInputs := QuestionInputs{
+				Table:            table,
+				Screen:           screen,
+				Texts:            values,
+				Apps:             appLabels(opts.Apps),
+				Copied:           copied,
+				CanScroll:        ScrollOffered(table, screen),
+				Launcher:         launcher,
+				Answers:          opts.Answers,
+				Clipboard:        true,
+				Goal:             opts.Goal,
+				RecentChoices:    recentChoicesOf(steps),
+				RecentActions:    recentActions,
+				LastUnchanged:    lastUnchanged,
+				Today:            deviceDate,
+				Guidance:         opts.Guidance,
+				VerificationNote: verificationNote,
+				TableTruncated:   table.Truncated,
+				TableGrid:        grid,
+			}
+			questions := BuildQuestions(questionInputs)
+			decision, err := AskDecision(AskDecisionOpts{
+				State: state, Questions: questions, AskFn: askFn, Log: logf, Model: opts.Model,
+			})
+			if err != nil {
+				return err
+			}
+			op := decision.Operation
+			// Every step record goes through here, so a trace sees exactly what
+			// ran.
+			emit := func(record StepRecord, hash string) {
+				steps = append(steps, record)
+				opts.Trace.RecordStep(TraceStep{
+					Step:           step,
+					QuestionInputs: questionInputs,
+					Questions:      questions,
+					Answers:        decision.Answers,
+					Criteria:       decision.Criteria,
+					Record:         record,
+					Hash:           hash,
+				})
+			}
+			if u := decision.Usage; u != nil {
+				if jsFinite(u.InputTokens) {
+					tokens.Input += u.InputTokens
+				}
+				if jsFinite(u.OutputTokens) {
+					tokens.Output += u.OutputTokens
+				}
+			}
+			// A rejected done leaves its unmet requirements on every later step;
+			// a verified done ends the episode, so no later step needs the note.
+			if decision.DoneVerify != nil && len(decision.DoneVerify.Unmet) > 0 {
+				note := UnmetNote(decision.DoneVerify.Unmet)
+				verificationNote = &note
+			} else if op.Choice == "done" {
+				verificationNote = nil
+			}
+
+			// done is the model's verdict, accepted as-is — one judgment per step.
+			// goal_met is recorded as a diagnostic only.
+			if op.Choice == "done" {
+				status = "done"
+				emit(StepRecord{
+					Step: step, Choice: strPtr(op.Choice),
+					Action:  "done (goal_met=" + formatFixed2(decision.GoalMet.Value) + ", conf=" + formatFixed2(op.Confidence) + ")",
+					Changed: nil, APIMs: decision.LatencyMs,
+					GoalMetNoul: floatPtr(decision.GoalMet.Value),
+				}, "")
+				break
+			}
+			if op.Choice == "blocked" {
+				status = "blocked"
+				reason := "model"
+				if len(table.Rows) == 0 {
+					reason = "blind_screen"
+				}
+				blockedReason = &reason
+				emit(StepRecord{
+					Step: step, Choice: strPtr(op.Choice),
+					Action:  "blocked (goal_met=" + formatFixed2(decision.GoalMet.Value) + ", conf=" + formatFixed2(op.Confidence) + ")",
+					Changed: nil, APIMs: decision.LatencyMs,
+					GoalMetNoul: floatPtr(decision.GoalMet.Value),
+				}, "")
+				break
+			}
+			// An answer ends the run the way done does — it is the terminal act
+			// for a question goal. Resolved here (never by the model) so the
+			// submitted text is exactly a row's text or a provided value.
+			var answer *string
+			if opts.Answers && isAnswerChoice(op.Choice) {
+				text, err := AnswerFor(op.Choice, table, values)
+				if err != nil {
+					return err
+				}
+				answer = &text
+			}
+			if answer != nil {
+				status = "answered"
+				emit(StepRecord{
+					Step: step, Choice: strPtr(op.Choice),
+					Action:  "answer " + JSONStringify(*answer) + " (conf=" + formatFixed2(op.Confidence) + ")",
+					Changed: nil, APIMs: decision.LatencyMs,
+					Answer: answer,
+				}, "")
+				break
+			}
+
+			action := op.Choice
+			var changed *bool
+			// Set when a paste runs this step: the raw staged text to verify
+			// against the post-settle table.
+			var stagedForVerify *string
+			stepT0 := time.Now()
+
+			// The validated argmax choice is executed as-is; a wrong tap is
+			// recoverable next step (back/home exist). No confidence gate —
+			// iteration is the safety net, not a threshold.
+			if m := clickChoiceRe.FindStringSubmatch(op.Choice); m != nil {
+				row := rowByIndex(table, m[1])
+				if row == nil || row.El == nil {
+					return NewDroidJevError("click target index " + m[1] + " not in current table; no action executed")
+				}
+				logf("step " + strconv.Itoa(step) + ": tap " + row.Row + " (conf " + formatFixed2(op.Confidence) + ")")
+				if err := dev.Tap(opts.Serial, centerOf(row.El)); err != nil {
+					return err
+				}
+				// History must record the state a tap PRODUCES, not the one it
+				// found: "tap check=on" after a flip reads as success when the tap
+				// actually turned the toggle off.
+				if row.El.Checkable {
+					now := "on"
+					if row.El.Checked {
+						now = "off"
+					}
+					action = "tap " + row.Row + " (now check=" + now + ")"
+				} else {
+					action = "tap " + row.Row
+				}
+			} else if m := holdChoiceRe.FindStringSubmatch(op.Choice); m != nil {
+				row := rowByIndex(table, m[1])
+				if row == nil || row.El == nil {
+					return NewDroidJevError("hold target index " + m[1] + " not in current table; no action executed")
+				}
+				logf("step " + strconv.Itoa(step) + ": hold " + row.Row + " (conf " + formatFixed2(op.Confidence) + ")")
+				if err := dev.LongPress(opts.Serial, centerOf(row.El)); err != nil {
+					return err
+				}
+				action = "hold " + row.Row
+			} else if m := setChoiceRe.FindStringSubmatch(op.Choice); m != nil {
+				row := rowByIndex(table, m[1])
+				var stop *SliderStop
+				stops := SliderStops(opts.Goal)
+				for i := range stops {
+					if stops[i].Key == m[2] {
+						stop = &stops[i]
+						break
+					}
+				}
+				if row == nil || stop == nil {
+					return NewDroidJevError("set target " + op.Choice +
+						" is not a slider stop in the current table; no action executed")
+				}
+				// A row with no rectangle has no drag: refuse instead of sending a
+				// zero-coordinate gesture at the screen's corner.
+				if row.El == nil || row.El.Bounds == nil {
+					return NewDroidJevError("set target " + op.Choice + " has no bounds; no action executed")
+				}
+				logf("step " + strconv.Itoa(step) + ": drag slider " + row.Row + " to " + stop.Label +
+					" (conf " + formatFixed2(op.Confidence) + ")")
+				if err := dev.SlideTo(opts.Serial, row.El, stop.Fraction); err != nil {
+					return err
+				}
+				action = "drag slider " + row.Row + " to " + stop.Label
+			} else if m := launchChoiceRe.FindStringSubmatch(op.Choice); m != nil {
+				idx, _ := strconv.Atoi(m[1])
+				if idx < 0 || idx >= len(opts.Apps) {
+					return NewDroidJevError("launch choice names an app that was not offered; no action executed")
+				}
+				app := opts.Apps[idx]
+				res, err := dev.StartApp(opts.Serial, app.Pkg)
+				if err != nil {
+					return err
+				}
+				if !res.Focused {
+					now := "?"
+					if res.App != nil {
+						now = res.App.Pkg
+					}
+					logf("        → " + app.Pkg + " did not take focus (now " + now + ")")
+				}
+				logf("step " + strconv.Itoa(step) + ": open " + app.Label + " (conf " + formatFixed2(op.Confidence) + ")")
+				action = "open " + app.Label
+			} else if m := typeChoiceRe.FindStringSubmatch(op.Choice); m != nil {
+				if len(values) == 0 {
+					return NewDroidJevError("model chose a type action but no text was provided (pass --text or name the value in the goal)")
+				}
+				row := rowByIndex(table, m[1])
+				if row == nil || row.El == nil {
+					return NewDroidJevError("type target index " + m[1] + " not in current table; no action executed")
+				}
+				idx, _ := strconv.Atoi(m[2])
+				if idx < 0 || idx >= len(values) {
+					return NewDroidJevError("type choice names provided_texts[" + m[2] +
+						"] which does not exist; no action executed")
+				}
+				value := values[idx]
+				if err := dev.Tap(opts.Serial, centerOf(row.El)); err != nil {
+					return err
+				}
+				dev.Sleep(350)
+				if err := dev.TypeText(opts.Serial, value); err != nil {
+					return err
+				}
+				logf("step " + strconv.Itoa(step) + ": type " + JSONStringify(value) + " into " + row.Row)
+				action = "type " + JSONStringify(value) + " into " + row.Row
+			} else if m := copyChoiceRe.FindStringSubmatch(op.Choice); m != nil {
+				row := rowByIndex(table, m[1])
+				if row == nil || row.El == nil || row.El.Text == "" {
+					return NewDroidJevError("copy target index " + m[1] +
+						" not in current table or has no text; no action executed")
+				}
+				// Same ceiling as operator-typed --text: a copy stages text on the
+				// clipboard that a later paste types into a focused field, so it
+				// must never exceed what the operator could have typed by hand.
+				staged := UTF16Truncate(row.El.Text, MaxCopyChars)
+				if err := dev.SetClipboard(opts.Serial, staged); err != nil {
+					return err
+				}
+				shown := preview(staged)
+				logf("step " + strconv.Itoa(step) + ": copy " + shown + " to the clipboard")
+				copied = true
+				// The clipboard is invisible to the view hierarchy: a copy cannot
+				// change the screen, so skip the settle + re-dump.
+				emit(StepRecord{
+					Step: step, Choice: strPtr(op.Choice),
+					Action:  "copy " + shown + " from " + row.Row,
+					Changed: nil, APIMs: decision.LatencyMs,
+					ActMs:      int64Ptr(time.Since(stepT0).Milliseconds()),
+					Confidence: floatPtr(op.Confidence),
+					StagedText: strPtr(staged),
+				}, "")
+				continue
+			} else if m := clipChoiceRe.FindStringSubmatch(op.Choice); m != nil {
+				idx, _ := strconv.Atoi(m[1])
+				if idx < 0 || idx >= len(values) {
+					return NewDroidJevError("clip choice names provided_texts[" + m[1] +
+						"] which does not exist; no action executed")
+				}
+				value := values[idx]
+				if err := dev.SetClipboard(opts.Serial, value); err != nil {
+					return err
+				}
+				shown := preview(value)
+				logf("step " + strconv.Itoa(step) + ": copy provided value " + shown + " to the clipboard")
+				copied = true
+				emit(StepRecord{
+					Step: step, Choice: strPtr(op.Choice),
+					Action:  "copy " + shown + " (the value the goal provides) to the clipboard",
+					Changed: nil, APIMs: decision.LatencyMs,
+					ActMs:      int64Ptr(time.Since(stepT0).Milliseconds()),
+					Confidence: floatPtr(op.Confidence),
+					StagedText: strPtr(value),
+				}, "")
+				continue
+			} else if strings.HasPrefix(op.Choice, "scroll_") {
+				dir := strings.TrimPrefix(op.Choice, "scroll_")
+				// Consecutive same-direction scrolls pace the distance (long
+				// lists); a reversal resets the pacing.
+				if dir == pace.lastScrollDir {
+					pace.sameDirRun++
+				} else {
+					pace.sameDirRun = 0
+				}
+				pace.lastScrollDir = dir
+				h := 2340
+				if screen != nil {
+					h = screen.H
+				}
+				if dir == "down" || dir == "up" {
+					scr := Screen{W: 1080, H: 2340}
+					if screen != nil {
+						scr = *screen
+					}
+					anchor := ScrollAnchor(table, scr)
+					dy := ScrollDistance(h, pace.sameDirRun)
+					if err := dev.ScrollSwipe(opts.Serial, anchor, dy, h, dir); err != nil {
+						return err
+					}
+					logf("step " + strconv.Itoa(step) + ": " + op.Choice + " (" +
+						strconv.Itoa(int(math.Round(float64(dy)/float64(h)*100))) + "% of screen)")
+				} else {
+					w := 1080
+					if screen != nil {
+						w = screen.W
+					}
+					anchor := ScrollAnchor(table, Screen{W: w, H: 2340})
+					if a := HorizontalAnchor(table, screen); a != nil {
+						anchor = *a
+					}
+					dx := ScrollDistance(w, pace.sameDirRun)
+					if err := dev.ScrollSwipeX(opts.Serial, anchor, dx, w, dir); err != nil {
+						return err
+					}
+					logf("step " + strconv.Itoa(step) + ": " + op.Choice + " (" +
+						strconv.Itoa(int(math.Round(float64(dx)/float64(w)*100))) + "% of screen)")
+				}
+			} else if op.Choice == "back" || op.Choice == "home" {
+				code := KeyBack
+				if op.Choice == "home" {
+					code = KeyHome
+				}
+				if err := dev.KeyEvent(opts.Serial, code); err != nil {
+					return err
+				}
+				pace.lastScrollDir = ""
+			} else if op.Choice == "paste" {
+				// Fail closed even though BuildQuestions no longer offers paste
+				// without a prior copy: validation only proves the choice was a
+				// legal member of the offered set, and both layers must enforce
+				// the same invariant.
+				if !copied {
+					return NewDroidJevError("model chose paste but no copy ran this run; no action executed")
+				}
+				var last *StepRecord
+				for i := len(steps) - 1; i >= 0; i-- {
+					if strings.HasPrefix(steps[i].Action, "copy ") {
+						last = &steps[i]
+						break
+					}
+				}
+				shown := "the copied text"
+				var staged *string
+				if last != nil {
+					shown = strings.TrimPrefix(last.Action, "copy ")
+					if i := strings.Index(shown, " from "); i >= 0 {
+						shown = shown[:i]
+					}
+					staged = last.StagedText
+				}
+				// Idempotency, same contract as typeText's set-semantics: pasting
+				// into a field that already holds the staged text would duplicate
+				// it. A no-op step needs no settle — the screen cannot have
+				// changed.
+				if staged != nil && *staged != "" && PasteOutcome(table, *staged).Landed {
+					logf("step " + strconv.Itoa(step) + ": paste " + shown + " — already in the field, skipped")
+					emit(StepRecord{
+						Step: step, Choice: strPtr(op.Choice),
+						Action:  "paste " + shown + " (already in the field)",
+						Changed: nil, APIMs: decision.LatencyMs,
+						ActMs:      int64Ptr(time.Since(stepT0).Milliseconds()),
+						Confidence: floatPtr(op.Confidence),
+					}, "")
+					continue
+				}
+				if err := dev.KeyEvent(opts.Serial, KeyPaste); err != nil {
+					return err
+				}
+				logf("step " + strconv.Itoa(step) + ": paste " + shown + " into the focused field")
+				action = "paste " + shown + " into the focused field"
+				stagedForVerify = staged
+			} else if op.Choice == "wait" {
+				dev.Sleep(700)
+			} else if strings.HasPrefix(op.Choice, "digits_") {
+				// The atomic keypad entry: KEYCODE_0..9 are 7..16.
+				seq := KeypadSequence(opts.Goal)
+				if seq == "" {
+					return NewDroidJevError("model chose digits but the goal names no digit sequence")
+				}
+				if err := dev.TypeDigits(opts.Serial, seq); err != nil {
+					return err
+				}
+				action = "type digits " + seq + " into the keypad"
+			} else {
+				return NewDroidJevError("unhandled operation " + op.Choice)
+			}
+
+			// Wait out screen motion by polling the dump: two consecutive
+			// identical hierarchy hashes mean nothing is animating anymore. The
+			// settled dump doubles as verification and the next step's table.
+			settleMs := settleMsFor(strings.HasPrefix(op.Choice, "scroll_"), opts.AnimationsOff)
+			next, err := dev.SettleLayout(opts.Serial, settleMs)
+			if err != nil {
+				return err
+			}
+			table = BuildTable(next.Elements, screen)
+			rootPkg = next.RootPkg
+			hash := TableHash(table)
+			changedVal := hash != prevHash
+			changed = &changedVal
+			prevHash = hash
+			seenHashes[hash]++
+			if appOrUnknown(rootPkg) != nav[len(nav)-1].App {
+				nav = append(nav, NavigationEntry{App: appOrUnknown(rootPkg), Step: step})
+			}
+			if changedVal {
+				unchangedRun = 0
+			} else {
+				unchangedRun++
+			}
+
+			// Paste verification: the paste key only works while an editable
+			// field holds focus, and focus is the model's guess — a miss is
+			// silent. If the staged text did not reach an edit row, try the
+			// clipboard suggestion (Chrome and most IMEs surface one); if that is
+			// missing too, record the miss in the step so recent_actions steers
+			// the next decision instead of a blind done.
+			if stagedForVerify != nil && *stagedForVerify != "" {
+				if outcome := PasteOutcome(table, *stagedForVerify); !outcome.Landed {
+					if chip := outcome.Chip; chip != nil && chip.El != nil {
+						logf("        → paste not in a field — tapping clipboard suggestion " + chip.Row)
+						if err := dev.Tap(opts.Serial, centerOf(chip.El)); err != nil {
+							return err
+						}
+						retry, err := dev.SettleLayout(opts.Serial, settleMs)
+						if err != nil {
+							return err
+						}
+						table = BuildTable(retry.Elements, screen)
+						rootPkg = retry.RootPkg
+						h2 := TableHash(table)
+						if h2 != hash {
+							changedVal = true
+							changed = &changedVal
+						}
+						prevHash = h2
+					}
+					if PasteOutcome(table, *stagedForVerify).Landed {
+						action += " (via clipboard suggestion)"
+					} else {
+						action += " (did not land)"
+					}
+				}
+			}
+
+			emit(StepRecord{
+				Step: step, Choice: strPtr(op.Choice), Action: action,
+				Changed: changed, APIMs: decision.LatencyMs,
+				ActMs:      int64Ptr(time.Since(stepT0).Milliseconds()),
+				Confidence: floatPtr(op.Confidence),
+			}, hash)
+			if *changed {
+				logf("        → screen changed")
+			} else {
+				logf("        → no visible change")
+			}
+			// The step budget is the stop. `changed` is context for the model and
+			// diagnostics for the caller — not an early-stop signal.
+		}
+		return nil
+	}()
+
+	if runErr != nil {
+		var de *DroidJevError
+		if !errors.As(runErr, &de) {
+			return GoalResult{}, runErr
+		}
+		failRun(runErr)
+	}
+
+	rows := SerializeRows(table)
+	if len(rows) > 15 {
+		rows = rows[:15]
+	}
+	if rows == nil {
+		rows = []string{}
+	}
+	return GoalResult{
+		Status:        status,
+		BlockedReason: blockedReason,
+		Goal:          opts.Goal,
+		Serial:        opts.Serial,
+		Steps:         steps,
+		Answer:        firstAnswer(steps),
+		Tokens:        tokens,
+		TookMs:        time.Since(t0).Milliseconds(),
+		FinalRows:     rows,
+		FinalApp:      nilIfEmptyStr(rootPkg),
+	}, nil
+}
+
+// --- loop helpers -----------------------------------------------------------
+
+func strPtr(s string) *string     { return &s }
+func boolPtr(b bool) *bool        { return &b }
+func floatPtr(f float64) *float64 { return &f }
+func int64Ptr(i int64) *int64     { return &i }
+
+// formatFixed2 is the JS toFixed(2): two decimals, no exponent.
+func formatFixed2(v float64) string { return strconv.FormatFloat(v, 'f', 2, 64) }
+
+// settleMsFor is the settle cap: a scroll's fling keeps the hierarchy moving
+// for ~0.5-1s but a mid-flight dump is readable, so it gets a short cap; screen
+// transitions (tap/type/back/home) wait for motion to complete. Animations off
+// cuts both — settled screens arrive a frame after the action.
+func settleMsFor(scroll, animationsOff bool) int64 {
+	switch {
+	case scroll && animationsOff:
+		return 150
+	case scroll:
+		return 250
+	case animationsOff:
+		return 400
+	default:
+		return 600
+	}
+}
+
+// preview is the short JSON-quoted step-action preview (60 UTF-16 units, then
+// an ellipsis).
+func preview(s string) string {
+	if UTF16Len(s) > 60 {
+		s = UTF16Truncate(s, 60) + "…"
+	}
+	return JSONStringify(s)
+}
+
+// randomUUID is crypto.randomUUID(): a v4 UUID, unique enough that a find-and-
+// replace reference can never collide with goal or row text.
+func randomUUID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		// crypto/rand never fails on supported platforms.
+		return "00000000-0000-4000-8000-000000000000"
+	}
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+
+// appOrUnknown is `rootPkg ?? 'unknown'`.
+func appOrUnknown(pkg string) string {
+	if pkg == "" {
+		return "unknown"
+	}
+	return pkg
+}
+
+func nilIfEmptyStr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func nilIfEmpty(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	return values
+}
+
+func jsFinite(f float64) bool { return !math.IsNaN(f) && !math.IsInf(f, 0) }
+
+// recentActionsOf is the model-facing history: the last ten steps, numbered,
+// with a no-change marker on the ones that settled to the same screen.
+func recentActionsOf(steps []StepRecord) []string {
+	start := 0
+	if len(steps) > 10 {
+		start = len(steps) - 10
+	}
+	out := make([]string, 0, len(steps)-start)
+	for _, s := range steps[start:] {
+		line := strconv.Itoa(s.Step) + ". " + s.Action
+		if s.Changed != nil && !*s.Changed {
+			line += " (no visible change)"
+		}
+		out = append(out, line)
+	}
+	return out
+}
+
+// recentChoicesOf is `steps.map(s => s.choice).filter(Boolean)`: a withheld
+// step contributes nothing.
+func recentChoicesOf(steps []StepRecord) []string {
+	out := make([]string, 0, len(steps))
+	for _, s := range steps {
+		if s.Choice != nil && *s.Choice != "" {
+			out = append(out, *s.Choice)
+		}
+	}
+	return out
+}
+
+// lastNavigation is `nav.slice(-n)`.
+func lastNavigation(nav []NavigationEntry, n int) []NavigationEntry {
+	if len(nav) <= n {
+		return nav
+	}
+	return nav[len(nav)-n:]
+}
+
+func appLabels(apps []App) []string {
+	if len(apps) == 0 {
+		return nil
+	}
+	out := make([]string, len(apps))
+	for i, a := range apps {
+		out[i] = a.Label
+	}
+	return out
+}
+
+func rowByIndex(t *Table, idx string) *Row {
+	for _, r := range tableRows(t) {
+		if r != nil && strconv.Itoa(r.Idx) == idx {
+			return r
+		}
+	}
+	return nil
+}
+
+// isAnswerChoice reports whether the choice is one of the answer_ family, i.e.
+// whether AnswerFor has a value to resolve (an empty submitted text is still an
+// answer, so the choice — not the resolved string — decides).
+func isAnswerChoice(choice string) bool {
+	return answerSingleRe.MatchString(choice) || answerListRe.MatchString(choice) ||
+		answerTextRe.MatchString(choice)
+}
+
+// firstAnswer is the submitted text of the first answering step (the JS
+// `steps.find((s) => s.answer)?.answer ?? null`: an empty answer is falsy
+// there, so it does not count).
+func firstAnswer(steps []StepRecord) *string {
+	for _, s := range steps {
+		if s.Answer != nil && *s.Answer != "" {
+			return s.Answer
+		}
+	}
+	return nil
 }

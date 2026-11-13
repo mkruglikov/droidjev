@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"net/http"
@@ -677,6 +678,74 @@ func TestAskRetriesAndCaps(t *testing.T) {
 			t.Fatalf("requests = %d, want 2", hits)
 		}
 	})
+}
+
+// A truncated response body is a transport failure, not a malformed answer:
+// it retries like the JS TypeError did. io.EOF joins for the same reason (a
+// reader that ends mid-body).
+func TestIsNetworkErrorTreatsTruncatedBodiesAsRetryable(t *testing.T) {
+	if !isNetworkError(io.ErrUnexpectedEOF) {
+		t.Error("isNetworkError(io.ErrUnexpectedEOF) = false, want true")
+	}
+	if !isNetworkError(io.EOF) {
+		t.Error("isNetworkError(io.EOF) = false, want true")
+	}
+	if !isNetworkError(fmt.Errorf("read body: %w", io.ErrUnexpectedEOF)) {
+		t.Error("isNetworkError(wrapped io.ErrUnexpectedEOF) = false, want true")
+	}
+}
+
+func TestAskRetriesATruncatedBody(t *testing.T) {
+	tsResetTypeSafe(t)
+	t.Setenv("TYPESAFE_API_KEY", "sk-test-12345")
+	var hits int
+	var mu sync.Mutex
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		hits++
+		mu.Unlock()
+		// Promise 100 bytes, deliver 11: the client's body read ends early.
+		w.Header().Set("Content-Length", "100")
+		io.WriteString(w, `{"answers":`)
+	}))
+	defer server.Close()
+	apiURL = server.URL
+
+	_, err := Ask(AskRequest{State: map[string]any{}, Questions: map[string]any{}, TimeoutMs: 5000})
+	tsWantExact(t, err, "typesafe api failed after 3 attempts: unexpected EOF")
+	mu.Lock()
+	defer mu.Unlock()
+	if hits != 3 {
+		t.Fatalf("requests = %d, want 3 (a truncated body retries)", hits)
+	}
+}
+
+// `"model": null` in a response means "not reported": the request's model
+// stands. It must never overwrite it with the empty string.
+func TestAskNullModelKeepsTheRequestModel(t *testing.T) {
+	tsResetTypeSafe(t)
+	t.Setenv("TYPESAFE_API_KEY", "sk-test-12345")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{"answers":{"operation":{"choice":"click"}},"model":null}`)
+	}))
+	defer server.Close()
+	apiURL = server.URL
+
+	res, err := Ask(AskRequest{State: map[string]any{}, Questions: map[string]any{}})
+	if err != nil {
+		t.Fatalf("Ask: %v", err)
+	}
+	if res.Model != DefaultModel {
+		t.Fatalf("model = %q, want %q (null falls back to the request model)", res.Model, DefaultModel)
+	}
+
+	res, err = Ask(AskRequest{State: map[string]any{}, Questions: map[string]any{}, Model: "jev-custom-1"})
+	if err != nil {
+		t.Fatalf("Ask(custom): %v", err)
+	}
+	if res.Model != "jev-custom-1" {
+		t.Fatalf("model = %q, want the requested jev-custom-1", res.Model)
+	}
 }
 
 func TestPrewarmSendsHead(t *testing.T) {

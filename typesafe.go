@@ -224,7 +224,9 @@ func Ask(req AskRequest) (*AskResult, error) {
 				result.Usage = &u
 			}
 		}
-		if raw, ok := parsed["model"]; ok {
+		// `"model": null` means "not reported" (the JS `json.model ?? model`):
+		// the request's model stands. Only a real string replaces it.
+		if raw, ok := parsed["model"]; ok && !isJSONNull(raw) {
 			var m string
 			if err := json.Unmarshal(raw, &m); err == nil {
 				result.Model = m
@@ -304,12 +306,17 @@ func truncateBytes(s string, n int) string {
 }
 
 // isNetworkError is the Go spelling of the JS `e instanceof TypeError ||
-// e?.name === 'AbortError'`: connection failures, DNS errors, and timeouts.
+// e?.name === 'AbortError'`: connection failures, DNS errors, timeouts, and a
+// body that ended before its Content-Length (the truncated-response case the
+// JS body read surfaced as a TypeError, and which retries the same way).
 func isNetworkError(err error) bool {
 	if err == nil {
 		return false
 	}
 	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return true
+	}
+	if errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.EOF) {
 		return true
 	}
 	var netErr net.Error
@@ -355,11 +362,15 @@ func IsValidationError(err error) bool {
 	return errors.As(err, &de) && strings.HasPrefix(de.Msg, "invalid typesafe answer")
 }
 
-// Choice is a validated choice answer.
+// Choice is a validated choice answer. Synthetic marks the host-made no-op a
+// step degrades to after two invalid answers (the JS SYNTHETIC_WAIT's
+// `synthetic: true`): it is schema-complete on purpose, so hosts index it
+// exactly like a real answer's probabilities.
 type Choice struct {
 	Choice        string
 	Probabilities map[string]float64
 	Confidence    float64
+	Synthetic     bool
 }
 
 // ValidatedChoice validates a choice answer against exactly the offered ids:
