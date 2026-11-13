@@ -4,6 +4,8 @@
 package main
 
 import (
+	"io"
+	"os"
 	"strings"
 	"testing"
 )
@@ -172,5 +174,90 @@ func TestActExitCode(t *testing.T) {
 		if got := actExitCode(tc.status); got != tc.want {
 			t.Fatalf("actExitCode(%q) = %d, want %d", tc.status, got, tc.want)
 		}
+	}
+}
+
+// runCaptured runs the CLI with stdout/stderr swapped for pipes, so dispatch
+// output can be asserted. The suite is sequential (no t.Parallel), so the
+// process-wide streams are safe to swap for the call.
+func runCaptured(t *testing.T, argv []string) (code int, stdout, stderr string) {
+	t.Helper()
+	oldOut, oldErr := os.Stdout, os.Stderr
+	outR, outW, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	errR, errW, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout, os.Stderr = outW, errW
+	defer func() { os.Stdout, os.Stderr = oldOut, oldErr }()
+	code = runCLI(argv)
+	if err := outW.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := errW.Close(); err != nil {
+		t.Fatal(err)
+	}
+	outBytes, err := io.ReadAll(outR)
+	if err != nil {
+		t.Fatal(err)
+	}
+	errBytes, err := io.ReadAll(errR)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := outR.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := errR.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return code, string(outBytes), string(errBytes)
+}
+
+func TestRunCLIHelp(t *testing.T) {
+	for _, argv := range [][]string{{"help"}, {"--help"}, {"-h"}} {
+		code, stdout, stderr := runCaptured(t, argv)
+		if code != 0 {
+			t.Fatalf("%v exit = %d, want 0", argv, code)
+		}
+		if stdout != USAGE+"\n" {
+			t.Fatalf("%v stdout = %q, want the usage text", argv, stdout)
+		}
+		if stderr != "" {
+			t.Fatalf("%v stderr = %q, want empty", argv, stderr)
+		}
+	}
+}
+
+func TestRunCLINoCommand(t *testing.T) {
+	code, stdout, stderr := runCaptured(t, nil)
+	if code != 3 {
+		t.Fatalf("no command exit = %d, want 3", code)
+	}
+	if stdout != USAGE+"\n" {
+		t.Fatalf("no command stdout = %q, want the usage text", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("no command stderr = %q, want empty", stderr)
+	}
+}
+
+func TestRunCLIUnknownCommand(t *testing.T) {
+	old := preflightFn
+	preflightFn = func(string) error { return nil }
+	defer func() { preflightFn = old }()
+
+	code, stdout, stderr := runCaptured(t, []string{"bogus"})
+	if code != 3 {
+		t.Fatalf("unknown command exit = %d, want 3", code)
+	}
+	if stdout != "" {
+		t.Fatalf("unknown command stdout = %q, want empty", stdout)
+	}
+	if !strings.Contains(stderr, "droidjev: unknown command: bogus\n\n"+USAGE+"\n") {
+		t.Fatalf("unknown command stderr = %q", stderr)
 	}
 }

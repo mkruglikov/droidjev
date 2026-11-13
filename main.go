@@ -345,14 +345,16 @@ func cmdBoot(f Flags) (int, error) {
 		errln("# " + n)
 	}
 	var avd *string
-	if IsEmulatorSerial(res.Serial) {
-		name, err := AvdName(res.Serial)
-		if err != nil {
-			return 0, err
-		}
-		avd = nilIfEmptyStr(name)
-	}
 	if f.JSON {
+		// Only the --json shape carries the AVD name; the human line must not
+		// pay for (or fail on) an extra adb call.
+		if IsEmulatorSerial(res.Serial) {
+			name, err := AvdName(res.Serial)
+			if err != nil {
+				return 0, err
+			}
+			avd = nilIfEmptyStr(name)
+		}
 		return 0, printJSON(struct {
 			Serial string  `json:"serial"`
 			Avd    *string `json:"avd"`
@@ -628,8 +630,12 @@ func cmdAct(f Flags) (int, error) {
 		result, err = RunGoal(opts)
 		return err
 	})
-	// A swallowed Ctrl-C wins the exit code: the restore above already ran.
+	// A swallowed Ctrl-C wins the exit code, but the run error it caused is
+	// still reported on stderr — the restore above already ran.
 	if SIGINTExitCode != 0 {
+		if runErr != nil {
+			fmt.Fprintln(os.Stderr, "droidjev: "+Redact(runErr.Error()))
+		}
 		return SIGINTExitCode, nil
 	}
 	if runErr != nil {
@@ -759,6 +765,10 @@ func preflight(cmd string) error {
 	return nil
 }
 
+// preflightFn is the preflight seam: tests replace it to exercise dispatch
+// without an adb on PATH.
+var preflightFn = preflight
+
 // reportError prints one redacted error line and returns its exit code:
 // DroidJevError's own code, else 3.
 func reportError(err error) int {
@@ -798,7 +808,7 @@ func runCLI(argv []string) int {
 		outln(USAGE)
 		return 0
 	}
-	if err := preflight(cmd); err != nil {
+	if err := preflightFn(cmd); err != nil {
 		return reportError(err)
 	}
 	var code int
