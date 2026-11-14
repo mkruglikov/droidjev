@@ -5,6 +5,78 @@ package main
 
 import "testing"
 
+// keyguardDumpUnlocked is the KeyguardServiceDelegate block of a live
+// emulator's `dumpsys window policy` while unlocked (API 36). The near-name
+// showingAndNotOccluded must not read as showing.
+const keyguardDumpUnlocked = `WINDOW MANAGER POLICY STATE (sysmultiwindow)
+    mAwake=true
+    KeyguardServiceDelegate
+      showing=false
+      showingAndNotOccluded=true
+      inputRestricted=false
+      occluded=false
+      secure=false
+      dreaming=false
+    mCurrentUserId=0
+`
+
+func TestParseKeyguard(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want KeyguardState
+	}{
+		{"unlocked emulator", keyguardDumpUnlocked, KeyguardState{}},
+		{
+			"secure keyguard showing (PIN)",
+			`    KeyguardServiceDelegate
+      showing=true
+      secure=true
+      dreaming=true
+`,
+			KeyguardState{Showing: true, Secure: true},
+		},
+		{
+			"swipe keyguard showing, not secure",
+			`    KeyguardServiceDelegate
+      showing=true
+      secure=false
+`,
+			KeyguardState{Showing: true},
+		},
+		{
+			"secure device, keyguard dismissed",
+			`    KeyguardServiceDelegate
+      showing=false
+      secure=true
+`,
+			KeyguardState{Secure: true},
+		},
+		{"no delegate block reads as unlocked", "mAwake=true\n", KeyguardState{}},
+		{
+			"the block ends at the next unindented section",
+			`KeyguardServiceDelegate
+      showing=true
+      secure=true
+NextSection showing=true
+`,
+			KeyguardState{Showing: true, Secure: true},
+		},
+	}
+	for _, c := range cases {
+		if got := parseKeyguard(c.in); got != c.want {
+			t.Errorf("%s: parseKeyguard = %+v, want %+v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestLockedError(t *testing.T) {
+	err := lockedError("emulator-5554")
+	if err.ExitCode != 2 {
+		t.Errorf("lockedError ExitCode = %d, want 2 (blocked)", err.ExitCode)
+	}
+}
+
 func TestPinHostGpuIni(t *testing.T) {
 	cases := []struct {
 		name string

@@ -50,7 +50,12 @@ be written in the UI's language.
   each) until two consecutive hierarchy hashes match — nothing is animating —
   then that settled dump doubles as the previous action's verification (hash
   comparison). Scroll flings get a short cap (a mid-flight dump is readable);
-  screen transitions wait for motion to complete.
+  screen transitions wait for motion to complete. The one exception that buys
+  back the short cap: a pure translation (an opening app drawer) keeps
+  identical content while bounds move, so when the scroll cap expires with
+  only bounds still changing, the settle extends once (~450 ms) until the
+  translation stops — a mid-translation dump would carry off-by-one-icon
+  bounds.
 - **Options are what the host can execute.** The question set is assembled from
   the capabilities the caller declares: a host with no clipboard passes
   `clipboard: false` and never sees `copy_`/`paste`, one whose goal is a

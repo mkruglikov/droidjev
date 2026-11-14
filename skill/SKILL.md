@@ -142,8 +142,9 @@ owns its observation/action pipeline.
 
 ## Good to know
 
-- Sleeping display is handled automatically (wake before every gesture); an
-  emulator with a PIN lock stays blocked.
+- Sleeping display is handled automatically (wake before every gesture); a
+  device with a PIN/pattern lock is reported blocked (exit 2, "secure lock
+  screen") before the first step.
 - A host that already has its own observation and action pipeline (a test
   harness, a web driver) can embed just the decision: `droidjev decide` reads a
   JSON request on stdin (`goal`, `elements`, `screen`, `provided_texts`,

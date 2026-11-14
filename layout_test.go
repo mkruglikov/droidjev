@@ -414,6 +414,83 @@ func TestSettleLayoutDeadline(t *testing.T) {
 	}
 }
 
+// settleXMLMoved is settleXMLA translated, and settleXMLFinal is where the
+// translation stops: identical content, moved bounds.
+const settleXMLMoved = `<hierarchy rotation="0"><node index="0" text="A" class="X" bounds="[0,40][10,50]"/></hierarchy>`
+const settleXMLFinal = `<hierarchy rotation="0"><node index="0" text="A" class="X" bounds="[0,100][10,110]"/></hierarchy>`
+
+func TestContentHash(t *testing.T) {
+	if contentHash(settleXMLA) != contentHash(settleXMLMoved) {
+		t.Error("a pure translation changed the content hash")
+	}
+	if contentHash(settleXMLA) == contentHash(settleXMLB) {
+		t.Error("different content hashed equal")
+	}
+}
+
+// settleTestClock replaces the settle loop's clock and sleep with a fake clock
+// that advances 80ms per sleep, so deadline behavior is deterministic.
+func settleTestClock() (restore func()) {
+	now := int64(0)
+	origNow, origSleep := settleNow, settleSleep
+	settleNow = func() int64 { return now }
+	settleSleep = func(ms int) { now += int64(ms) }
+	return func() { settleNow, settleSleep = origNow, origSleep }
+}
+
+// TestSettleLayoutDrawer: the deadline arrives while only bounds still move
+// (an opening drawer is a pure translation) — the wait extends once and the
+// settled dump is the one where motion stopped.
+func TestSettleLayoutDrawer(t *testing.T) {
+	origSource, restoreClock := uia2Source, settleTestClock()
+	defer func() { uia2Source = origSource; restoreClock() }()
+
+	// A → translated (content stable, bounds moving) → final → final.
+	dumps := []string{settleXMLA, settleXMLMoved, settleXMLFinal, settleXMLFinal}
+	calls := 0
+	uia2Source = func(string) (string, error) {
+		xml := dumps[calls]
+		calls++
+		return xml, nil
+	}
+	layout, err := SettleLayout("emulator-5554", 100)
+	if err != nil {
+		t.Fatalf("SettleLayout: %v", err)
+	}
+	if layout.Xml != settleXMLFinal {
+		t.Errorf("settled Xml = %q, want the post-motion dump", layout.Xml)
+	}
+	if calls != 4 {
+		t.Errorf("dump calls = %d, want 4 (one per poll + the settle)", calls)
+	}
+}
+
+// TestSettleLayoutFlingDeadline: content still changing at the deadline is
+// fling noise — the settle returns at the cap with no extension.
+func TestSettleLayoutFlingDeadline(t *testing.T) {
+	origSource, restoreClock := uia2Source, settleTestClock()
+	defer func() { uia2Source = origSource; restoreClock() }()
+
+	calls := 0
+	uia2Source = func(string) (string, error) {
+		calls++
+		if calls == 1 {
+			return settleXMLA, nil
+		}
+		return settleXMLB, nil
+	}
+	layout, err := SettleLayout("emulator-5554", 100)
+	if err != nil {
+		t.Fatalf("SettleLayout: %v", err)
+	}
+	if layout.Xml != settleXMLB {
+		t.Errorf("settled Xml = %q, want the last dump before the deadline", layout.Xml)
+	}
+	if calls != 2 {
+		t.Errorf("dump calls = %d, want 2 (no extension for fling noise)", calls)
+	}
+}
+
 func TestSettleLayoutError(t *testing.T) {
 	orig := uia2Source
 	defer func() { uia2Source = orig }()

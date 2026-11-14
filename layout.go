@@ -331,21 +331,61 @@ func xmlHash(xml string) string {
 	return hex.EncodeToString(sum[:])[:16]
 }
 
+// boundsAttrRe matches a node's bounds attribute — the only thing a pure
+// translation (an opening drawer) changes while it moves.
+var boundsAttrRe = regexp.MustCompile(` bounds="\[\d+,\d+\]\[\d+,\d+\]"`)
+
+// contentHash is xmlHash over the dump with bounds attributes stripped: two
+// dumps with the same content hash differ only in where things sit on screen.
+func contentHash(xml string) string {
+	sum := sha256.Sum256([]byte(boundsAttrRe.ReplaceAllString(xml, "")))
+	return hex.EncodeToString(sum[:])[:16]
+}
+
+// settleExtendMs is the one-shot deadline extension SettleLayout grants a pure
+// translation: enough for a drawer's opening animation to finish (~300ms)
+// without ever waiting out a scroll fling's noise.
+const settleExtendMs int64 = 450
+
+// settleNow/settleSleep are the settle loop's clock and sleep seams: tests
+// drive both so the deadline behavior is exercised without real waits.
+var (
+	settleNow   = func() int64 { return time.Now().UnixMilli() }
+	settleSleep = Sleep
+)
+
 // SettleLayout waits out screen motion by polling the dump: two consecutive
 // identical hierarchy hashes mean nothing (elements, states, bounds) is
 // changing anymore. The final layout is returned so the caller reuses it as
 // its dump instead of sleeping a fixed time and dumping once more.
+//
+// A scroll's short cap (settleMsFor) trusts that a mid-fling dump is readable,
+// and flings keep CONTENT changing — waiting buys nothing. One motion defeats
+// that cap: a pure translation keeps identical content while everything moves
+// (the Pixel launcher's opening drawer), so a dump at the deadline carries
+// mid-flight bounds and the next tap lands one icon off. When the deadline
+// arrives while only bounds still move, the wait is extended once so the
+// translation can finish.
 func SettleLayout(serial string, maxMs int64) (*Layout, error) {
-	deadline := time.Now().UnixMilli() + maxMs
+	deadline := settleNow() + maxMs
 	prev, err := GetLayout(serial)
 	if err != nil {
 		return nil, err
 	}
 	prevH := xmlHash(prev.Xml)
+	prevC := contentHash(prev.Xml)
+	// Content was identical between the last two dumps, so the only motion
+	// left can be positional (a pure translation).
+	contentStable := false
+	extended := false
 	for {
-		Sleep(80)
-		if time.Now().UnixMilli() >= deadline {
-			return prev, nil
+		settleSleep(80)
+		if settleNow() >= deadline {
+			if extended || !contentStable {
+				return prev, nil
+			}
+			extended = true
+			deadline = settleNow() + settleExtendMs
 		}
 		next, err := GetLayout(serial)
 		if err != nil {
@@ -355,6 +395,8 @@ func SettleLayout(serial string, maxMs int64) (*Layout, error) {
 		if h == prevH {
 			return next, nil
 		}
-		prev, prevH = next, h
+		c := contentHash(next.Xml)
+		contentStable = c == prevC
+		prev, prevH, prevC = next, h, c
 	}
 }

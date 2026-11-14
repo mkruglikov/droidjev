@@ -146,37 +146,107 @@ func waitBoot(serial string, timeoutMs int64) (bool, error) {
 	return false, nil
 }
 
+// KeyguardState is the lock-screen answer for a device: whether a keyguard is
+// showing, and whether it is a secure one (PIN, pattern or password).
+type KeyguardState struct {
+	Showing bool
+	Secure  bool
+}
+
+// ReadKeyguard reads the keyguard state from `dumpsys window policy`. The
+// KeyguardServiceDelegate block has carried showing=/secure= for years; a dump
+// without the block reads as unlocked (best effort, like the rest of the boot
+// path).
+func ReadKeyguard(serial string) (KeyguardState, error) {
+	r, err := Shell(serial, []string{"dumpsys", "window", "policy"}, RunOpts{TimeoutMs: 8000})
+	if err != nil {
+		return KeyguardState{}, err
+	}
+	return parseKeyguard(string(r.Stdout)), nil
+}
+
+// parseKeyguard reads showing/secure out of the KeyguardServiceDelegate block.
+// The block's lines are indented under the header; the first unindented line
+// ends it. Exact-line matching keeps near-names (showingAndNotOccluded) out.
+func parseKeyguard(dump string) KeyguardState {
+	i := strings.Index(dump, "KeyguardServiceDelegate")
+	if i < 0 {
+		return KeyguardState{}
+	}
+	var st KeyguardState
+	for _, line := range strings.Split(dump[i:], "\n")[1:] {
+		if line == "" || line[0] != ' ' && line[0] != '\t' {
+			break
+		}
+		switch strings.TrimSpace(line) {
+		case "showing=true":
+			st.Showing = true
+		case "secure=true":
+			st.Secure = true
+		}
+	}
+	return st
+}
+
+// lockedError is the blocked-on-device verdict for a secure keyguard: keys
+// cannot dismiss it, so the run stops (exit 2) naming the remedy.
+func lockedError(serial string) *DroidJevError {
+	return &DroidJevError{
+		Msg: serial + " is showing a secure lock screen (PIN/pattern/password) — keys cannot dismiss it; " +
+			"unlock the device by hand, or boot an AVD without a lock screen",
+		ExitCode: 2,
+	}
+}
+
 // WakeAndUnlock wakes the display and dismisses a simple keyguard. An already
-// awake screen gets no keys and no settle delay.
-//
-// ponytail: wake + MENU key only dismisses a non-secure keyguard; a locked
-// emulator with a PIN stays blocked. Upgrade path: check `dumpsys window`
-// keyguard state and report blocked_locked explicitly.
+// awake screen sitting on a swipe keyguard gets the MENU dismiss too. A secure
+// keyguard (PIN, pattern, password) cannot be dismissed by keys: it is
+// reported as blocked (exit 2) instead of leaving the run to flail on the lock
+// screen.
 func WakeAndUnlock(serial string) error {
 	pre, err := Shell(serial, []string{"dumpsys", "power"}, RunOpts{TimeoutMs: 8000})
 	if err != nil {
 		return err
 	}
-	if wakefulnessRe.MatchString(string(pre.Stdout)) {
+	if !wakefulnessRe.MatchString(string(pre.Stdout)) {
+		for attempt := 0; attempt < 2; attempt++ {
+			if _, err := Shell(serial, []string{"input", "keyevent", "224"}, RunOpts{}); err != nil { // KEYCODE_WAKE_UP
+				return err
+			}
+			Sleep(300)
+			r, err := Shell(serial, []string{"dumpsys", "power"}, RunOpts{TimeoutMs: 8000})
+			if err != nil {
+				return err
+			}
+			if wakefulnessRe.MatchString(string(r.Stdout)) {
+				break
+			}
+		}
+		if _, err := Shell(serial, []string{"input", "keyevent", "82"}, RunOpts{}); err != nil { // MENU dismisses simple keyguard
+			return err
+		}
+		Sleep(250)
+		// A secure keyguard survives wake + MENU; an unreadable policy dump
+		// reads as unlocked (best effort, like the rest of the boot path).
+		if kg, err := ReadKeyguard(serial); err == nil && kg.Showing && kg.Secure {
+			return lockedError(serial)
+		}
 		return nil
 	}
-	for attempt := 0; attempt < 2; attempt++ {
-		if _, err := Shell(serial, []string{"input", "keyevent", "224"}, RunOpts{}); err != nil { // KEYCODE_WAKE_UP
+	// Already awake: no keys — unless it sits on a lock screen.
+	kg, kerr := ReadKeyguard(serial)
+	if kerr != nil {
+		return nil
+	}
+	if kg.Showing && kg.Secure {
+		return lockedError(serial)
+	}
+	if kg.Showing { // a swipe keyguard: dismiss it like the wake path does
+		if _, err := Shell(serial, []string{"input", "keyevent", "82"}, RunOpts{}); err != nil {
 			return err
 		}
-		Sleep(300)
-		r, err := Shell(serial, []string{"dumpsys", "power"}, RunOpts{TimeoutMs: 8000})
-		if err != nil {
-			return err
-		}
-		if wakefulnessRe.MatchString(string(r.Stdout)) {
-			break
-		}
+		Sleep(250)
 	}
-	if _, err := Shell(serial, []string{"input", "keyevent", "82"}, RunOpts{}); err != nil { // MENU dismisses simple keyguard
-		return err
-	}
-	Sleep(250)
 	return nil
 }
 
