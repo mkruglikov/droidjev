@@ -343,22 +343,33 @@ func Prewarm() {
 
 // --- strict answer validation (model output never becomes coordinates/commands) ---
 
+// invalidAnswerError is a malformed model answer. It wraps the DroidJevError
+// the CLI reports if one escapes (message and exit code unchanged), so
+// IsValidationError is a type test rather than a string-prefix match.
+type invalidAnswerError struct {
+	dj *DroidJevError
+}
+
+func (e *invalidAnswerError) Error() string { return e.dj.Error() }
+func (e *invalidAnswerError) Unwrap() error { return e.dj }
+
 // invalidAnswer builds the JS validator's `bad(why)` error. Messages are
 // concatenated (not %q) so quoting is byte-identical to the template literal.
-func invalidAnswer(qid, why string, noAction bool) *DroidJevError {
+func invalidAnswer(qid, why string, noAction bool) *invalidAnswerError {
 	msg := `invalid typesafe answer for "` + qid + `" (` + why + `)`
 	if noAction {
 		msg += "; no action executed"
 	}
-	return NewDroidJevError(msg)
+	return &invalidAnswerError{dj: NewDroidJevError(msg)}
 }
 
 // IsValidationError reports a malformed model answer — routine, not fatal: a
 // caller may retry the same request once. Every validator consumer shares this
-// one predicate.
+// one predicate. Only invalidAnswer constructs these: a hand-built
+// DroidJevError carrying the old message prefix does not count.
 func IsValidationError(err error) bool {
-	var de *DroidJevError
-	return errors.As(err, &de) && strings.HasPrefix(de.Msg, "invalid typesafe answer")
+	var e *invalidAnswerError
+	return errors.As(err, &e)
 }
 
 // Choice is a validated choice answer. Synthetic marks the host-made no-op a

@@ -155,7 +155,7 @@ func FindLabel(opts FindOpts) (FindResult, error) {
 			stalled = false
 		}
 		prevHash, hasPrev = h, true
-		screenW, screenH := 1080, 2340
+		screenW, screenH := defaultScreenW, defaultScreenH
 		if s.Screen != nil {
 			screenW, screenH = s.Screen.W, s.Screen.H
 		}

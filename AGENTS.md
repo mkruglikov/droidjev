@@ -36,7 +36,7 @@ go run . <cmd>                # run the CLI in place
 
 ## Layout
 
-- `main.go` — CLI entry: arg parsing, dispatch, `USAGE`, `main()`.
+- `main.go` — CLI entry: arg parsing, dispatch, `usage`, `main()`.
 - `agent.go` — the `act` goal loop: builds the single per-step question
   (operation + goal_met in parallel), executes argmax as-is, double-checks
   `done`. An empty element table diverts to the vision step: one request with a

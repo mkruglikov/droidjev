@@ -18,6 +18,15 @@
   non-secure keyguard).
 - `find` scrolls top-down only; run it from the top of a list for labels that
   may sit above the current position.
+- **Stale taps when a scroll opens a drawer**: the post-scroll settle compares
+  table content only (labels and states — positions are deliberately ignored
+  so a scroll's fling noise cannot fake progress). An opening animation that
+  is a pure translation (the Pixel launcher's app drawer) keeps identical
+  content while it moves, so the settled dump can carry mid-flight bounds and
+  the tap lands one icon off (observed: tapping "Contacts" opened Messages,
+  the icon directly beneath). `--no-animations` makes the drawer snap in
+  ~1 frame and removes the race; older launchers (API 33) settle before the
+  first poll.
 - Default target is emulators; driving a physical phone requires explicit
   `--device`.
 - `--trace` files contain the goal and on-screen values; they live only under

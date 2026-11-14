@@ -588,7 +588,7 @@ func ScrollAnchor(t *Table, screen Screen) Point {
 // nil when no dump signal says the axis is horizontal: a class that names it,
 // or a short wide container whose children sit side by side.
 func HorizontalAnchor(t *Table, screen *Screen) *Point {
-	h := 2340
+	h := defaultScreenH
 	if screen != nil {
 		h = screen.H
 	}

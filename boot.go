@@ -471,7 +471,7 @@ func EnsureDevice(device string) (EnsureResult, error) {
 	}
 	if len(pending) > 0 {
 		serial := pending[0].Serial
-		notices = append(notices, fmt.Sprintf(`%s present as "%s" — waiting for it to come online`, serial, pending[0].State))
+		addNotice(&notices, fmt.Sprintf(`%s present as "%s" — waiting for it to come online`, serial, pending[0].State))
 		deadline := time.Now().UnixMilli() + pendingWaitMs
 		for time.Now().UnixMilli() < deadline {
 			now, err := AdbDevices()
@@ -554,7 +554,7 @@ func EnsureDevice(device string) (EnsureResult, error) {
 	if len(avds) == 0 {
 		return EnsureResult{}, NewDroidJevError("no devices online and no AVDs found (`android emulator list`)")
 	}
-	notices = append(notices, fmt.Sprintf(`no device online; using first AVD "%s"`, avds[0]))
+	addNotice(&notices, fmt.Sprintf(`no device online; using first AVD "%s"`, avds[0]))
 	res, err := BootAvd(avds[0], &notices)
 	if err != nil {
 		return EnsureResult{}, err

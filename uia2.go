@@ -612,6 +612,3 @@ func Stop(serial string) {
 		_, _ = Shell(serial, []string{"am", "force-stop", pkg}, RunOpts{TimeoutMs: 8000})
 	}
 }
-
-// Wire layout.GetLayout's seam to the real resident server.
-func init() { uia2Source = Source }

@@ -298,11 +298,9 @@ type Layout struct {
 	RootPkg  string
 }
 
-// uia2Source is the seam uia2.go wires to Source in its init. Keeping it a
-// package-level var lets this file compile and its tests run without a device.
-var uia2Source = func(serial string) (string, error) {
-	return "", NewDroidJevError("uia2 source is not wired yet")
-}
+// uia2Source is the dump seam: production is uia2.go's resident-server Source;
+// tests replace it so GetLayout runs without a device.
+var uia2Source = Source
 
 // GetLayout dumps and parses the hierarchy once.
 func GetLayout(serial string) (*Layout, error) {

@@ -170,11 +170,7 @@ type cappedBuffer struct {
 func (w *cappedBuffer) Write(p []byte) (int, error) {
 	n := len(p)
 	if room := w.limit - int64(len(w.buf)); room > 0 {
-		if int64(n) > room {
-			w.buf = append(w.buf, p[:room]...)
-		} else {
-			w.buf = append(w.buf, p...)
-		}
+		w.buf = append(w.buf, p[:min(int64(n), room)]...)
 	}
 	return n, nil
 }

@@ -200,7 +200,7 @@ func ScrollDistance(screenH, sameDirRun int) int {
 // screens with no scrollable at all do not qualify — the anchor would fall back
 // to screen center, which with the keyboard up lands ON the keyboard.
 func ScrollOffered(t *Table, screen *Screen) bool {
-	h := 2340
+	h := defaultScreenH
 	if screen != nil {
 		h = screen.H
 	}
@@ -278,7 +278,7 @@ func PasteOutcome(t *Table, staged string) PasteResult {
 			}
 		}
 	}
-	return PasteResult{landed, chip}
+	return PasteResult{Landed: landed, Chip: chip}
 }
 
 // FieldHolds reports whether a field already displays exactly a provided value:
@@ -872,7 +872,7 @@ func VisionVerdict(operation Choice, screenReadable Noul, tapTarget Box) Verdict
 // BoxCenter maps box fractions to a tap point in screen pixels. The screenshot
 // is the full screen, so a fraction of the image is a fraction of the screen.
 func BoxCenter(box Box, screen *Screen) Point {
-	w, h := 1080, 2340
+	w, h := defaultScreenW, defaultScreenH
 	if screen != nil {
 		w, h = screen.W, screen.H
 	}
@@ -1822,7 +1822,7 @@ func visionStep(o visionStepOpts) (visionOutcome, error) {
 			o.Pacing.sameDirRun = 0
 		}
 		o.Pacing.lastScrollDir = dir
-		w, h := 1080, 2340
+		w, h := defaultScreenW, defaultScreenH
 		if o.Screen != nil {
 			w, h = o.Screen.W, o.Screen.H
 		}
@@ -2364,12 +2364,12 @@ func RunGoal(opts GoalOpts) (GoalResult, error) {
 					pace.sameDirRun = 0
 				}
 				pace.lastScrollDir = dir
-				h := 2340
+				h := defaultScreenH
 				if screen != nil {
 					h = screen.H
 				}
 				if dir == "down" || dir == "up" {
-					scr := Screen{W: 1080, H: 2340}
+					scr := Screen{W: defaultScreenW, H: defaultScreenH}
 					if screen != nil {
 						scr = *screen
 					}
@@ -2381,11 +2381,11 @@ func RunGoal(opts GoalOpts) (GoalResult, error) {
 					logf("step " + strconv.Itoa(step) + ": " + op.Choice + " (" +
 						strconv.Itoa(int(math.Round(float64(dy)/float64(h)*100))) + "% of screen)")
 				} else {
-					w := 1080
+					w := defaultScreenW
 					if screen != nil {
 						w = screen.W
 					}
-					anchor := ScrollAnchor(table, Screen{W: w, H: 2340})
+					anchor := ScrollAnchor(table, Screen{W: w, H: defaultScreenH})
 					if a := HorizontalAnchor(table, screen); a != nil {
 						anchor = *a
 					}

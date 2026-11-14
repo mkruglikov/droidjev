@@ -19,7 +19,7 @@ import (
 // -ldflags "-X main.version=vX.Y.Z".
 var version = "dev"
 
-var USAGE = "droidjev " + version + ` — fast jev-powered Android emulator clicker (text-first;
+var usage = "droidjev " + version + ` — fast jev-powered Android emulator clicker (text-first;
 a screenshot is sent only for a blind screen or a ` + "`check`" + ` verdict)
 
 usage: droidjev <command> [args] [flags]
@@ -751,7 +751,7 @@ func preflight(cmd string) error {
 		_, err := RequireApiKey() // no device involved: the caller supplies the element table
 		return err
 	}
-	r, err := Run("adb", []string{"version"}, RunOpts{TimeoutMs: 8000})
+	r, err := Run(adb, []string{"version"}, RunOpts{TimeoutMs: 8000})
 	if err != nil {
 		return err
 	}
@@ -794,7 +794,7 @@ func runCLI(argv []string) int {
 		cmd = flags.Args[0]
 	}
 	if flags.Help || cmd == "" {
-		outln(USAGE)
+		outln(usage)
 		if flags.Help {
 			return 0
 		}
@@ -805,7 +805,7 @@ func runCLI(argv []string) int {
 		outln(version)
 		return 0
 	case "help":
-		outln(USAGE)
+		outln(usage)
 		return 0
 	}
 	if err := preflightFn(cmd); err != nil {
@@ -830,7 +830,7 @@ func runCLI(argv []string) int {
 	case "decide":
 		code, err = cmdDecide(flags)
 	default:
-		err = NewDroidJevError("unknown command: " + cmd + "\n\n" + USAGE)
+		err = NewDroidJevError("unknown command: " + cmd + "\n\n" + usage)
 	}
 	if err != nil {
 		return reportError(err)

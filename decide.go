@@ -226,6 +226,7 @@ func BuildDecideRequest(req DecideRequest) (DecideBuilt, error) {
 	if req.Clipboard != nil {
 		clipboard = *req.Clipboard
 	}
+	// The host's explicit answer must not pay for a table scan it overrides.
 	canScroll := false
 	if req.CanScroll == nil {
 		canScroll = ScrollOffered(table, screen)

@@ -1,5 +1,5 @@
 // main.go tests: the CLI surface ported from the Node implementation's CLI
-// section, plus the USAGE/version gate and the act exit-code mapping.
+// section, plus the usage/version gate and the act exit-code mapping.
 
 package main
 
@@ -145,16 +145,16 @@ func TestEnvTrace(t *testing.T) {
 }
 
 func TestUsageContainsVersion(t *testing.T) {
-	if !strings.HasPrefix(USAGE, "droidjev "+version+" — ") {
-		t.Fatalf("USAGE does not start with the versioned banner: %q", USAGE[:min(60, len(USAGE))])
+	if !strings.HasPrefix(usage, "droidjev "+version+" — ") {
+		t.Fatalf("usage does not start with the versioned banner: %q", usage[:min(60, len(usage))])
 	}
 	for _, want := range []string{
 		"usage: droidjev <command> [args] [flags]",
 		"a screenshot is sent only for a blind screen or a `check` verdict",
 		"exit codes: 0 done, 2 blocked, 3 error",
 	} {
-		if !strings.Contains(USAGE, want) {
-			t.Fatalf("USAGE missing %q", want)
+		if !strings.Contains(usage, want) {
+			t.Fatalf("usage missing %q", want)
 		}
 	}
 }
@@ -223,7 +223,7 @@ func TestRunCLIHelp(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("%v exit = %d, want 0", argv, code)
 		}
-		if stdout != USAGE+"\n" {
+		if stdout != usage+"\n" {
 			t.Fatalf("%v stdout = %q, want the usage text", argv, stdout)
 		}
 		if stderr != "" {
@@ -237,7 +237,7 @@ func TestRunCLINoCommand(t *testing.T) {
 	if code != 3 {
 		t.Fatalf("no command exit = %d, want 3", code)
 	}
-	if stdout != USAGE+"\n" {
+	if stdout != usage+"\n" {
 		t.Fatalf("no command stdout = %q, want the usage text", stdout)
 	}
 	if stderr != "" {
@@ -257,7 +257,7 @@ func TestRunCLIUnknownCommand(t *testing.T) {
 	if stdout != "" {
 		t.Fatalf("unknown command stdout = %q, want empty", stdout)
 	}
-	if !strings.Contains(stderr, "droidjev: unknown command: bogus\n\n"+USAGE+"\n") {
+	if !strings.Contains(stderr, "droidjev: unknown command: bogus\n\n"+usage+"\n") {
 		t.Fatalf("unknown command stderr = %q", stderr)
 	}
 }

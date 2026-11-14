@@ -32,6 +32,13 @@ type Screen struct {
 	App  string
 }
 
+// The fallback viewport every screen-size consumer assumes when `wm size`
+// reports nothing: the 1080x2340 phone panel the Node port hardcoded.
+const (
+	defaultScreenW = 1080
+	defaultScreenH = 2340
+)
+
 // FocusedApp is the package/activity component of the focused window.
 type FocusedApp struct {
 	Pkg      string
