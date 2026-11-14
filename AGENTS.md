@@ -136,10 +136,13 @@ go run . <cmd>                # run the CLI in place
   (`adb shell am force-stop io.appium.uiautomator2.server` hands it back).
 - Clipboard writes can't change the hierarchy — copy steps skip the settle and
   re-dump entirely (`copy_<idx>`/`paste` ops).
-- `find` scrolls top-down only; it stops as soon as scrolling provably cannot
-  help, and retries once after waking before declaring end-of-list.
+- `find` scrolls to the top of the list first (an up-scroll that changes
+  nothing twice), then scans down; it stops as soon as scrolling provably
+  cannot help, and retries once after waking before declaring end-of-list.
 - Vision fallback is jev-1.14-only (`box`) and blind-screens-only; a failed
   screenshot pipeline degrades to `blocked:blind_screen`, never to an error.
+  A box tap that lands on a readable interactive row snaps to that row's exact
+  center (`SnapBoxToRow`; container-sized rows never snap).
   Two blind screens hash identically (both tables are empty), so vision steps
   cannot rely on the hash for change detection.
 - README.md documents user-facing behavior and links the deep dives in `docs/`

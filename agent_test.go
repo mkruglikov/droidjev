@@ -863,6 +863,91 @@ func TestBoxCenter(t *testing.T) {
 	}
 }
 
+func snapRow(idx int, l, t, r, b int) *Row {
+	return &Row{
+		Idx: idx, Interactive: true,
+		El: &Element{Clickable: true, Bounds: &Bounds{L: l, T: t, R: r, B: b}, Center: &Point{X: (l + r + 1) / 2, Y: (t + b + 1) / 2}},
+	}
+}
+
+func TestSnapBoxToRow(t *testing.T) {
+	screen := &Screen{W: 1080, H: 2340}
+	table := &Table{Rows: []*Row{
+		snapRow(0, 0, 100, 1080, 300),           // the readable chrome row
+		snapRow(1, 0, 100, 1080, 2340),          // a full-height container around it
+		{Idx: 2, El: &Element{Clickable: true}}, // interactive but no bounds
+		{Idx: 3, Interactive: false, El: &Element{Bounds: &Bounds{L: 0, T: 1000, R: 1080, B: 1100}}}, // not interactive
+	}}
+	if row, p := SnapBoxToRow(Point{X: 540, Y: 199}, table, screen); row == nil || row.Idx != 0 || p != (Point{X: 540, Y: 200}) {
+		t.Errorf("inside both rows = row %v point %v, want the smaller row 0 at its center 540,200", row, p)
+	}
+	if row, _ := SnapBoxToRow(Point{X: 540, Y: 315}, table, screen); row == nil || row.Idx != 0 {
+		t.Errorf("boxSnapMargin reach = row %v, want row 0 (315 is within 24px of its bottom 300)", row)
+	}
+	if row, p := SnapBoxToRow(Point{X: 540, Y: 800}, table, screen); row != nil || p != (Point{X: 540, Y: 800}) {
+		t.Errorf("content inside a fullscreen container = row %v point %v, want no snap", row, p)
+	}
+	if row, _ := SnapBoxToRow(Point{X: 540, Y: 1050}, table, screen); row != nil {
+		t.Errorf("a non-interactive row must not capture the tap, got %v", row)
+	}
+	if row, p := SnapBoxToRow(Point{X: 1, Y: 1}, &Table{}, screen); row != nil || p != (Point{X: 1, Y: 1}) {
+		t.Errorf("blind screen (no rows) = row %v point %v, want no snap", row, p)
+	}
+}
+
+// The hybrid vision step: the model's box lands on the one readable row of a
+// sparse screen, and the tap goes to that row's dump-read center, not the
+// box's guessed center.
+func TestVisionStepSnapsBoxToReadableRow(t *testing.T) {
+	xml := `<hierarchy rotation="0">` +
+		`<android.widget.EditText package="com.android.chrome" text="Search or type URL" bounds="[0,100][1080,300]" clickable="true" />` +
+		`</hierarchy>`
+	elements, err := ParseUia2Xml(xml)
+	if err != nil {
+		t.Fatalf("ParseUia2Xml: %v", err)
+	}
+	table := BuildTable(elements, &Screen{W: 1080, H: 2340, App: "com.android.chrome"})
+	if len(table.Rows) != 1 {
+		t.Fatalf("table rows = %d, want the one readable row", len(table.Rows))
+	}
+	var taps []Point
+	conf := 0.9
+	io := stubIO(IO{
+		Tap:           func(serial string, c Point) error { taps = append(taps, c); return nil },
+		ScreenshotPng: func(serial string) (ShotResult, error) { return ShotResult{Png: []byte("png")}, nil },
+	})
+	// Box center = (540, 199): inside the readable row, off its true center.
+	box := Box{Left: 0.4, Right: 0.6, Top: 0.08, Bottom: 0.09}
+	out, err := visionStep(visionStepOpts{
+		Serial: "emulator-5554", Step: 1, Goal: "tap the address bar",
+		Screen: &Screen{W: 1080, H: 2340}, AppPkg: "com.android.chrome",
+		Pacing: &pacing{}, PrevHash: "h", Log: func(string) {}, IO: io, Table: table,
+		AskFn: func(req AskRequest) (*AskResult, error) {
+			vq, ok := req.Questions.(VisionQuestions)
+			if !ok {
+				t.Fatalf("questions = %T, want VisionQuestions", req.Questions)
+			}
+			return askResult(map[string]json.RawMessage{
+				"operation":       choiceRaw(t, vq.Operation.Criteria.Keys(), "tap_box"),
+				"screen_readable": noulRaw(0.9),
+				"tap_target":      boxRaw(t, box, &conf),
+			}, 7), nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("visionStep: %v", err)
+	}
+	if len(taps) != 1 {
+		t.Fatalf("taps = %v, want one", taps)
+	}
+	if taps[0] != (Point{X: 540, Y: 200}) {
+		t.Errorf("tap = %v, want the row's dump-read center 540,200", taps[0])
+	}
+	if want := "tap (by screenshot) 540,200"; out.Record.Action != want {
+		t.Errorf("action = %q, want %q", out.Record.Action, want)
+	}
+}
+
 func TestLowInfoVisionAndEffectiveVision(t *testing.T) {
 	info := func(interactive int) *Table {
 		rows := make([]*Row, interactive)

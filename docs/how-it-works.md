@@ -31,7 +31,11 @@ be written in the UI's language.
   Box edges are validated 0–1 fractions forming an in-bounds rectangle, which
   code resolves to the tap point; below the confidence floor (0.6, the docs'
   example value) the tap is withheld and the step is recorded as a no-op so
-  the next decision can pick another route. `--no-vision` keeps the old
+  the next decision can pick another route. On a partly readable screen
+  (`--hybrid-vision`), a tap point that lands on one of the few readable
+  interactive rows snaps to that row's exact dump-read center — a hierarchy
+  rectangle beats a guessed box, so only genuinely unreadable targets ride
+  the raw box. `--no-vision` keeps the old
   behavior (an empty table blocks with `blind_screen`). Screenshots leave the
   machine only on this path — and they carry whatever the screen shows, the
   same privacy surface as the element table's text plus pixels.

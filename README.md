@@ -106,7 +106,8 @@ droidjev devices                 list emulators with AVD names (raw adb, ~15ms)
 droidjev boot [avd]              ensure an emulator is booted (auto-picks first AVD)
 droidjev start <package>         launch an app by package (deterministic, no model)
 droidjev snapshot [--grep "…"]   indexed element table of the current screen (no model)
-droidjev find "<label>" [--tap]  deterministically search scrollable content top-down
+droidjev find "<label>" [--tap]  deterministically search scrollable content
+                                (scrolls to the top first, then scans down)
                                  for a label and optionally tap it (~0.6s/iteration,
                                  no tokens); stops as soon as scrolling provably cannot help
 droidjev act "<goal>" [flags]    run the agent loop until done/blocked/answered
@@ -165,7 +166,7 @@ step taken so far.
 - **[Security model](https://github.com/mkruglikov/droidjev/blob/master/docs/security.md)** —
   API-key handling, subprocess spawning, and model-answer validation.
 - **[Known limits](https://github.com/mkruglikov/droidjev/blob/master/docs/known-limits.md)** —
-  blind screens and the vision fallback, ASCII-only typing, top-down `find`,
+  blind screens and the vision fallback, ASCII-only typing,
   emulator-first targeting.
 - **[Development](https://github.com/mkruglikov/droidjev/blob/master/docs/development.md)** —
   building from source, tests, formatting.

@@ -882,6 +882,58 @@ func BoxCenter(box Box, screen *Screen) Point {
 	}
 }
 
+// boxSnapMargin is how far outside a readable row's bounds a vision tap point
+// may sit and still snap to it: coarse box grounding misses a row's center by
+// a little, not by a whole control.
+const boxSnapMargin = 24
+
+// boxSnapMaxFraction is the screen-area fraction above which a row is a
+// container, not a control — a fullscreen clickable WebView would otherwise
+// capture every box tap and drag it to the screen center.
+const boxSnapMaxFraction = 0.5
+
+// SnapBoxToRow snaps a vision tap point onto the readable table: when the
+// model's box center lands inside (or boxSnapMargin px outside) one of the
+// interactive rows the dump can read, that row's own center is the accurate
+// tap — image grounding is prototype-grade, and a dump-read rectangle beats a
+// guessed one. A hybrid screen exposes only a few such rows (the rest is
+// unreadable content), so a hit is almost certainly the intended target; a
+// blind screen has none and nothing snaps. Nested hits resolve to the smallest
+// (most specific) row; container-sized rows (≥ half the screen, when the
+// screen size is known) never snap.
+func SnapBoxToRow(c Point, t *Table, screen *Screen) (*Row, Point) {
+	if t == nil {
+		return nil, c
+	}
+	maxArea := 0 // 0 = unknown screen, no container filter
+	if screen != nil && screen.W > 0 && screen.H > 0 {
+		maxArea = int(float64(screen.W*screen.H) * boxSnapMaxFraction)
+	}
+	var best *Row
+	bestArea := 0
+	for _, r := range t.Rows {
+		if r == nil || !r.Interactive || r.El == nil || r.El.Bounds == nil {
+			continue
+		}
+		b := r.El.Bounds
+		if !(c.X >= b.L-boxSnapMargin && c.X <= b.R+boxSnapMargin &&
+			c.Y >= b.T-boxSnapMargin && c.Y <= b.B+boxSnapMargin) {
+			continue
+		}
+		area := (b.R - b.L) * (b.B - b.T)
+		if maxArea > 0 && area >= maxArea {
+			continue // a container, not the control the box meant
+		}
+		if best == nil || area < bestArea {
+			best, bestArea = r, area
+		}
+	}
+	if best == nil {
+		return nil, c
+	}
+	return best, centerOf(best.El)
+}
+
 // LowInfoVision is the hybrid gate: a table with only a few interactive rows
 // (WebView chrome over unreadable content) — or a screen that just refused to
 // change — is barely more informative than a blind one.
@@ -1798,6 +1850,10 @@ func visionStep(o visionStepOpts) (visionOutcome, error) {
 	switch {
 	case verdict.Kind == "tap":
 		c := BoxCenter(*verdict.Box, o.Screen)
+		if row, snapped := SnapBoxToRow(c, o.Table, o.Screen); row != nil {
+			c = snapped
+			o.Log("        → box tap snapped to readable row " + row.Row)
+		}
 		o.Log("step " + strconv.Itoa(o.Step) + ": vision tap " + strconv.Itoa(c.X) + "," + strconv.Itoa(c.Y) +
 			" (conf " + formatFixed2(operation.Confidence) + ")")
 		if err := o.IO.Tap(o.Serial, c); err != nil {

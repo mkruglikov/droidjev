@@ -4,7 +4,10 @@
 //
 // Ported from the Node implementation: ranking, the hash-stall
 // wake-and-retry-once, the 60% scroll, the 600ms settle, and both stop reasons
-// are kept exact.
+// are kept exact. One deliberate divergence: the Node loop only scrolled down,
+// so a label above the starting position was unreachable; this scan scrolls to
+// the top of the list first (an up-scroll that changes nothing twice), then
+// walks down — end_of_list is now an exhaustive verdict.
 
 package main
 
@@ -92,9 +95,49 @@ func MatchRows(t *Table, query string) ([]*Row, error) {
 
 func rowClickable(r *Row) bool { return r != nil && r.El != nil && r.El.Clickable }
 
+// findIO is FindLabel's device seam: production is the real device; tests
+// drive a scripted list. Scroll swipes AND waits out the fling (the settle is
+// part of one scroll step for the hash-stall logic).
+type findIO struct {
+	Snapshot func(serial string) (*Snapshot, error)
+	Scroll   func(serial string, s *Snapshot, dir string) error
+	Wake     func(serial string) error
+	Tap      func(serial string, el *Element) error
+}
+
 // FindLabel scrolls the screen looking for label, optionally tapping the best
-// match.
+// match. The scan runs in two phases: it first scrolls UP until the screen
+// stops changing (the top of the list — a label can sit above the position
+// the run starts from), then scans DOWN through the whole list. The Node
+// implementation only scrolled down.
 func FindLabel(opts FindOpts) (FindResult, error) {
+	return findScan(opts, findIO{
+		Snapshot: TakeSnapshot,
+		Scroll: func(serial string, s *Snapshot, dir string) error {
+			screenW, screenH := defaultScreenW, defaultScreenH
+			if s.Screen != nil {
+				screenW, screenH = s.Screen.W, s.Screen.H
+			}
+			anchor := ScrollAnchor(s.Table, Screen{W: screenW, H: screenH})
+			// Math.round(screen.h * 0.6): halves round up.
+			dy := int(math.Floor(float64(screenH)*0.6 + 0.5))
+			if err := ScrollSwipe(serial, anchor, dy, screenH, dir, 0); err != nil {
+				return err
+			}
+			// Outlast the fling's overscroll bounce: while it plays, rows
+			// flicker across the clip edge and every dump hashes differently,
+			// faking progress. Polling ends as soon as the hierarchy stops
+			// moving.
+			_, err := SettleLayout(serial, 600)
+			return err
+		},
+		Wake: WakeAndUnlock,
+		Tap:  func(serial string, el *Element) error { return Tap(serial, centerOf(el)) },
+	})
+}
+
+// findScan is the two-phase search loop behind the findIO seam.
+func findScan(opts FindOpts, io findIO) (FindResult, error) {
 	log := opts.Log
 	if log == nil {
 		log = func(string) {}
@@ -106,8 +149,9 @@ func FindLabel(opts FindOpts) (FindResult, error) {
 	prevHash := ""
 	hasPrev := false
 	stalled := false // one hash-repeat triggers a wake-and-retry (doze eats gestures silently)
+	up := true       // phase 1: scroll to the top; phase 2: scan down
 	for i := 1; i <= maxIterations; i++ {
-		s, err := TakeSnapshot(opts.Serial)
+		s, err := io.Snapshot(opts.Serial)
 		if err != nil {
 			return FindResult{}, err
 		}
@@ -120,7 +164,7 @@ func FindLabel(opts FindOpts) (FindResult, error) {
 			// A coordinate tap on the label hits whatever clickable element
 			// contains it, so tapping a text row works for standard list rows.
 			if opts.TapIt {
-				if err := Tap(opts.Serial, centerOf(best.El)); err != nil {
+				if err := io.Tap(opts.Serial, best.El); err != nil {
 					return FindResult{}, err
 				}
 				log(fmt.Sprintf("iteration %d: tapped %s", i, best.Row))
@@ -144,34 +188,33 @@ func FindLabel(opts FindOpts) (FindResult, error) {
 		h := TableHash(s.Table)
 		if hasPrev && h == prevHash {
 			if stalled {
-				return findMiss(i, "end_of_list"), nil
-			}
-			stalled = true
-			log(fmt.Sprintf("iteration %d: screen unchanged — waking display and retrying once", i))
-			if err := WakeAndUnlock(opts.Serial); err != nil {
-				return FindResult{}, err
+				if !up {
+					return findMiss(i, "end_of_list"), nil
+				}
+				// Scrolling up changed nothing twice: this is the top. Switch
+				// to the down-scan and keep this iteration's scroll.
+				up = false
+				stalled = false
+				log(fmt.Sprintf("iteration %d: reached the top — scanning down", i))
+			} else {
+				stalled = true
+				log(fmt.Sprintf("iteration %d: screen unchanged — waking display and retrying once", i))
+				if err := io.Wake(opts.Serial); err != nil {
+					return FindResult{}, err
+				}
 			}
 		} else {
 			stalled = false
 		}
 		prevHash, hasPrev = h, true
-		screenW, screenH := defaultScreenW, defaultScreenH
-		if s.Screen != nil {
-			screenW, screenH = s.Screen.W, s.Screen.H
+		dir := "down"
+		if up {
+			dir = "up"
 		}
-		anchor := ScrollAnchor(s.Table, Screen{W: screenW, H: screenH})
-		// Math.round(screen.h * 0.6): halves round up.
-		dy := int(math.Floor(float64(screenH)*0.6 + 0.5))
-		if err := ScrollSwipe(opts.Serial, anchor, dy, screenH, "down", 0); err != nil {
+		if err := io.Scroll(opts.Serial, s, dir); err != nil {
 			return FindResult{}, err
 		}
-		log(fmt.Sprintf("iteration %d: \"%s\" not visible — scrolled", i, opts.Label))
-		// Outlast the fling's overscroll bounce: while it plays, rows flicker
-		// across the clip edge and every dump hashes differently, faking
-		// progress. Polling ends as soon as the hierarchy stops moving.
-		if _, err := SettleLayout(opts.Serial, 600); err != nil {
-			return FindResult{}, err
-		}
+		log(fmt.Sprintf("iteration %d: \"%s\" not visible — scrolled %s", i, opts.Label, dir))
 	}
 	return findMiss(maxIterations, "max_iterations"), nil
 }

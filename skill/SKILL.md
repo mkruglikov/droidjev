@@ -45,8 +45,8 @@ model and are useful for setup or a single targeted lookup:
 
 ```bash
 droidjev start com.android.settings   # launch an app by package (am start/monkey)
-droidjev find "About phone" --tap     # search scrollable lists top-down for a
-                                      # label, tap the exact match (~0.6s/iteration)
+droidjev find "About phone" --tap     # scroll to the top of a list, then search
+                                      # it downward; tap the exact match (~0.6s/iteration)
 droidjev snapshot --grep "battery"    # filtered view of the current screen
 ```
 
