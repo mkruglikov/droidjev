@@ -113,8 +113,7 @@ func (t *Trace) RecordStep(rec TraceStep) {
 }
 
 // RecordResult writes the episode result, picking the fields the original
-// picked
-// (`status`, `blockedReason`, `tookMs`, `tokens`). Map membership is the
+// picked (`status`, `blockedReason`, `tookMs`, `tokens`). Map membership is the
 // "defined" test: a present nil value is written as JSON null, a missing one is
 // omitted.
 func (t *Trace) RecordResult(result map[string]any) {

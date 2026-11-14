@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 // --- fixtures ---------------------------------------------------------------
@@ -951,6 +952,47 @@ func TestRunGoalFailureBeforeFirstStep(t *testing.T) {
 	}
 }
 
+// Prewarm is fire-and-forget: the loop must not join the key-less HEAD before
+// the first device call. The stub blocks until released; an awaited pre-warm
+// would leave RunGoal stuck and the timeout catches it.
+func TestRunGoalPrewarmIsNotAwaited(t *testing.T) {
+	called := make(chan struct{}, 1)
+	release := make(chan struct{})
+	io := stubIO(IO{
+		ScreenSize: func(serial string) (*Screen, error) {
+			return nil, NewDroidJevError("no device")
+		},
+		Prewarm: func() {
+			called <- struct{}{}
+			<-release
+		},
+	})
+	done := make(chan error, 1)
+	go func() {
+		_, err := RunGoal(GoalOpts{
+			Serial: "emulator-5554", Goal: "open settings", IO: &io,
+			AskFn: func(AskRequest) (*AskResult, error) { return nil, errors.New("unreachable") },
+			Log:   func(string) {},
+		})
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		close(release)
+		if err != nil {
+			t.Fatalf("RunGoal: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		close(release)
+		t.Fatal("RunGoal awaited Prewarm")
+	}
+	select {
+	case <-called:
+	case <-time.After(2 * time.Second):
+		t.Error("Prewarm was never fired")
+	}
+}
+
 // A non-DroidJevError is a real bug and propagates.
 func TestRunGoalNonDroidJevErrorPropagates(t *testing.T) {
 	io := stubIO(IO{
@@ -1295,6 +1337,10 @@ func TestAgentStateKeyOrder(t *testing.T) {
 	}
 	if strings.Contains(s, `"seen_before"`) {
 		t.Errorf("seen_before must be omitted when false: %s", s)
+	}
+	// No note is JSON null, present-not-omitted (the Node `elements_note: null`).
+	if !strings.Contains(s, `"elements_note":null`) {
+		t.Errorf("empty elements_note must be present and null: %s", s)
 	}
 }
 

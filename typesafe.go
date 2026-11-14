@@ -35,8 +35,7 @@ import (
 const DefaultModel = "jev-1.14.0"
 
 // Injectable seams: tests point apiURL at an httptest server, stub keyRunner
-// for the login-shell fallback, and (Task 13) reuse httpClient for the uia2
-// HTTP calls.
+// for the login-shell fallback, and share httpClient with the uia2 HTTP calls.
 var (
 	apiURL     = "https://api.typesafe.ai/v1/systemone"
 	keyRunner  = Run

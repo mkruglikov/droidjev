@@ -1,7 +1,8 @@
 # Development
 
 From a checkout: `git clone https://github.com/mkruglikov/droidjev`, then run
-`go run .` in place — Go ≥ 1.27 and the standard library are all it needs;
+`go run .` in place — Go ≥ 1.27.4 (the floor `go.mod` pins) and the standard
+library are all it needs;
 there are no external modules to fetch.
 
 ```bash

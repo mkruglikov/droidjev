@@ -54,7 +54,7 @@ binary.
 
 ## Installation
 
-1. **`TYPESAFE_API_KEY`** — `act` and `check` talk to the model.
+1. **`TYPESAFE_API_KEY`** — `act`, `check` and `decide` talk to the model.
    Get a key at [docs.typesafe.ai](https://docs.typesafe.ai), then add
    `export TYPESAFE_API_KEY=…` to your shell profile.
 2. **droidjev itself** — download the latest macOS (Apple Silicon) build from
@@ -62,12 +62,15 @@ binary.
    or, for `v0.5.0`:
    ```bash
    curl -L https://github.com/mkruglikov/droidjev/releases/download/v0.5.0/droidjev-0.5.0-darwin-arm64.tar.gz | tar xz
-   sudo mv droidjev /usr/local/bin/
+   sudo install -m 755 droidjev /usr/local/bin/   # or /opt/homebrew/bin on Apple Silicon
    ```
    Each tarball ships with a `.sha256` file; download it too and verify with
    `shasum -a 256 -c droidjev-0.5.0-darwin-arm64.tar.gz.sha256`. On another
    OS/architecture, build from source — see
    [Development](https://github.com/mkruglikov/droidjev/blob/master/docs/development.md).
+   A tarball downloaded through a browser keeps the Gatekeeper quarantine
+   attribute and may be refused on first run; the `curl | tar` form above does
+   not carry it, and code signing is a stated non-goal.
 3. **Verify:** `droidjev devices` — with an emulator up it lists it;
    `no devices online` is fine too (`droidjev boot` boots the first AVD).
 

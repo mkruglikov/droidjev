@@ -519,12 +519,19 @@ func ContainsBounds(outer, inner Bounds) bool {
 }
 
 // centerOf: providers set center alongside bounds; a host-supplied table may
-// not, and a gesture needs a point either way.
+// not, and a gesture needs a point either way. A nil element or bounds yields
+// the zero point rather than a panic (the Node code's caught TypeError).
 func centerOf(el *Element) Point {
+	if el == nil {
+		return Point{}
+	}
 	if el.Center != nil {
 		return *el.Center
 	}
 	b := el.Bounds
+	if b == nil {
+		return Point{}
+	}
 	return Point{X: jsRoundHalf(b.L + b.R), Y: jsRoundHalf(b.T + b.B)}
 }
 

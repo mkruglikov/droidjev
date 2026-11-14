@@ -487,6 +487,17 @@ func TestHorizontalAnchor(t *testing.T) {
 	}
 }
 
+// A host-supplied element without bounds must not panic: code falls back to
+// the zero point instead of crashing the CLI.
+func TestCenterOfNilBounds(t *testing.T) {
+	if got := centerOf(&Element{}); got != (Point{}) {
+		t.Errorf("centerOf(nil bounds) = %#v, want the zero point", got)
+	}
+	if got := centerOf(nil); got != (Point{}) {
+		t.Errorf("centerOf(nil element) = %#v, want the zero point", got)
+	}
+}
+
 // A container's items read in screen order, with the inner duplicate of an
 // adopted label dropped.
 func TestListItemsAndElementText(t *testing.T) {

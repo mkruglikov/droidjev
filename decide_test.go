@@ -108,6 +108,51 @@ func TestBuildDecideRequestRequiresGoalAndElements(t *testing.T) {
 	}
 }
 
+func TestDecideElementParentIdxNullIsNoParent(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+		want int
+	}{
+		{"null", `{"parentIdx":null}`, -1},
+		{"absent", `{}`, -1},
+		{"explicit zero", `{"parentIdx":0}`, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var req DecideRequest
+			raw := `{"goal":"g","elements":[` + tc.body + `]}`
+			if err := json.Unmarshal([]byte(raw), &req); err != nil {
+				t.Fatalf("unmarshal decide request: %v", err)
+			}
+			if len(req.Elements) != 1 || req.Elements[0] == nil {
+				t.Fatalf("elements = %#v", req.Elements)
+			}
+			if req.Elements[0].ParentIdx != tc.want {
+				t.Errorf("parentIdx = %d, want %d", req.Elements[0].ParentIdx, tc.want)
+			}
+		})
+	}
+}
+
+func TestBuildDecideRequestKeepsExplicitEmptyApp(t *testing.T) {
+	unknown, err := BuildDecideRequest(decideRequest(func(r *DecideRequest) { r.Screen = nil }))
+	if err != nil {
+		t.Fatalf("BuildDecideRequest: %v", err)
+	}
+	if unknown.State.Screen.App != "unknown" {
+		t.Errorf("absent screen app = %q, want unknown", unknown.State.Screen.App)
+	}
+	empty, err := BuildDecideRequest(decideRequest(func(r *DecideRequest) {
+		r.Screen = &DecideScreen{App: "", W: 1080, H: 2400}
+	}))
+	if err != nil {
+		t.Fatalf("BuildDecideRequest: %v", err)
+	}
+	if empty.State.Screen.App != "" {
+		t.Errorf("explicit empty app = %q, want \"\"", empty.State.Screen.App)
+	}
+}
+
 func TestBuildDecideRequestOffersOperations(t *testing.T) {
 	built, err := BuildDecideRequest(decideRequest(nil))
 	if err != nil {

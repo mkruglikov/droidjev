@@ -36,7 +36,7 @@ go run . <cmd>                # run the CLI in place
 
 ## Layout
 
-- `main.go` — CLI entry: arg parsing, dispatch, `USAGE`, `bootstrap()`.
+- `main.go` — CLI entry: arg parsing, dispatch, `USAGE`, `main()`.
 - `agent.go` — the `act` goal loop: builds the single per-step question
   (operation + goal_met in parallel), executes argmax as-is, double-checks
   `done`. An empty element table diverts to the vision step: one request with a
@@ -54,7 +54,7 @@ go run . <cmd>                # run the CLI in place
   hierarchy hash, scroll anchor. One dump per step; the settle polls dumps until
   two consecutive hashes match.
 - `adb.go` — thin adb wrapper; `boot.go` — device pick, AVD boot, wake/unlock,
-  `withAnimationsOff`; `find.go` — deterministic label search; `start.go` —
+  `WithAnimationsOff`; `find.go` — deterministic label search; `start.go` —
   launch by package; `snapshot.go` — table print.
 - `decide.go` — the device-free `decide` protocol (one JSON request in, one
   validated answer out; `--serve` keeps the process).

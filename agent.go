@@ -1118,7 +1118,7 @@ type AgentState struct {
 	Today            *string           `json:"today"`
 	Screen           AgentStateScreen  `json:"screen"`
 	Elements         []string          `json:"elements"`
-	ElementsNote     string            `json:"elements_note"`
+	ElementsNote     *string           `json:"elements_note"`
 	Requirements     []string          `json:"requirements"`
 	SeenBefore       bool              `json:"seen_before,omitempty"`
 	Navigation       []NavigationEntry `json:"navigation"`
@@ -1962,7 +1962,9 @@ func RunGoal(opts GoalOpts) (GoalResult, error) {
 
 	runErr := func() error {
 		// The first dump starts the on-device uia2 server (~1s); the key-less
-		// connection warm-up rides alongside it.
+		// connection warm-up is fired alongside it and never awaited, so its
+		// HEAD handshake overlaps the dump instead of serializing before it.
+		go dev.Prewarm()
 		screen, err := dev.ScreenSize(opts.Serial)
 		if err != nil {
 			return err
@@ -1971,7 +1973,6 @@ func RunGoal(opts GoalOpts) (GoalResult, error) {
 		if err != nil {
 			return err
 		}
-		dev.Prewarm()
 		deviceDate, _ := dev.DeviceToday(opts.Serial)
 		// Focused app from the dump's root package — dumpsys would cost an
 		// extra adb roundtrip per step for the same answer.
@@ -2070,7 +2071,7 @@ func RunGoal(opts GoalOpts) (GoalResult, error) {
 				Today:            deviceDate,
 				Screen:           AgentStateScreen{App: appPkg, Size: size, Launcher: launcher},
 				Elements:         SerializeRows(table),
-				ElementsNote:     ElementsNote(table, launcher),
+				ElementsNote:     nilIfEmptyStr(ElementsNote(table, launcher)),
 				Requirements:     requirements,
 				SeenBefore:       seenHashes[prevHash] > 1,
 				Navigation:       lastNavigation(nav, 6),

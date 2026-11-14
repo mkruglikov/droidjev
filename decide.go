@@ -232,8 +232,10 @@ func BuildDecideRequest(req DecideRequest) (DecideBuilt, error) {
 	} else {
 		canScroll = *req.CanScroll
 	}
+	// appOrUnknown is nullish-only: an explicit "" stays "", only a null/absent
+	// screen becomes "unknown" (the JS `?? 'unknown'`).
 	app := "unknown"
-	if req.Screen != nil && req.Screen.App != "" {
+	if req.Screen != nil {
 		app = req.Screen.App
 	}
 	launcher := launcherRe.MatchString(app)

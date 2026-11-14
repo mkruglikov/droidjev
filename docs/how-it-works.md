@@ -43,8 +43,9 @@ be written in the UI's language.
   parallel. The
   model cannot point at the right element while declining to click it: the
   target and the action are the same judgment, and its argmax is executed
-  as-is. A key-less HEAD pre-warms the HTTPS connection during the initial
-  dump, so the first request skips the per-process TLS handshake (~0.5s).
+  as-is. A key-less HEAD is fired in the background before the initial dump,
+  so its handshake overlaps the dump and the first request skips the
+  per-process TLS handshake (~0.5s).
 - **One dump per step.** The post-action settle polls the dump (~20–50 ms
   each) until two consecutive hierarchy hashes match — nothing is animating —
   then that settled dump doubles as the previous action's verification (hash
@@ -59,6 +60,12 @@ be written in the UI's language.
   picks, and droidjev resolves the text. An editable row is offered as
   `type_<idx>_<k>` rather than `click_<idx>`: clicking a field only focuses it,
   which is the trap a date picker sets.
+- **The `decide` wire is typed.** A host with its own observation/action
+  pipeline sends one JSON request per decision (`goal`, `screen`, `elements`,
+  `provided_texts`, …). Root elements carry `parentIdx: -1`; the wire accepts
+  `null` or an absent key as "no parent", while an explicit index — including
+  `0` — names that element. `clipboard: null` is treated as absent (default
+  `true`), and a non-boolean truthy value is rejected rather than coerced.
 - **The table is filtered, not dumped.** Status-bar chrome from the platform's
   own package is dropped (a clock reading "15:34" looks exactly like a time
   field), and a grid of same-sized unlabeled cells — a calendar's month, a

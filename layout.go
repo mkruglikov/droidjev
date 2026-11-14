@@ -13,6 +13,7 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"regexp"
 	"strconv"
 	"strings"
@@ -60,6 +61,26 @@ type Element struct {
 	Focused       bool    `json:"focused,omitempty"`
 	Selected      bool    `json:"selected,omitempty"`
 	Password      bool    `json:"password,omitempty"`
+}
+
+// UnmarshalJSON maps a null or absent parentIdx to -1 (the wire's "no parent")
+// instead of Go's zero value, which BuildTable would read as "parent is
+// element 0".
+func (el *Element) UnmarshalJSON(b []byte) error {
+	type elementAlias Element
+	aux := struct {
+		ParentIdx *int `json:"parentIdx"`
+		*elementAlias
+	}{elementAlias: (*elementAlias)(el)}
+	if err := json.Unmarshal(b, &aux); err != nil {
+		return err
+	}
+	if aux.ParentIdx == nil {
+		el.ParentIdx = -1
+	} else {
+		el.ParentIdx = *aux.ParentIdx
+	}
+	return nil
 }
 
 // boolAttrs is the JS BOOL_ATTRS vocabulary. Both spellings of
