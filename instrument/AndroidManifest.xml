@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The droidjev instrumentation APK: one APK, zero dependencies (no androidx,
+     no test-runner library, no activities, no services). It self-instruments
+     (targetPackage = own package), so
+     `am instrument dev.droidjev.instrument/dev.droidjev.instrument.Runner`
+     starts the resident layout server over an abstract unix socket. Nothing
+     shows on the launcher and nothing is user-launchable; the APK exists only
+     while droidjev drives the emulator. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="dev.droidjev.instrument">
+
+  <instrumentation
+      android:name=".Runner"
+      android:targetPackage="dev.droidjev.instrument"
+      android:label="droidjev instrument"/>
+
+  <application android:label="droidjev-instrument" android:hasCode="true"/>
+</manifest>

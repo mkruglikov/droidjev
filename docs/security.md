@@ -39,12 +39,17 @@
   assert the live key value is absent). Delete the directory to purge. A trace
   that cannot write (full disk, read-only cache) disables itself with one
   notice instead of failing the episode.
-- **Helper APKs are pinned.** The uiautomator2 server/test APKs and
-  `io.appium.settings` are downloaded from pinned release URLs and verified
-  against committed SHA-256 digests before install; the cache key carries the
-  digest, so a stale or tampered cached file can never be reused. Scope: this
-  covers the downloads droidjev makes — a device that already has the helper
-  packages installed is used as-is, unverified.
+- **The instrumentation APK is first-party.** The resident layout/clipboard
+  instrumentation is built from this repository's own source (`instrument/`)
+  by CI — javac + d8 + aapt2 + apksigner, no third-party code, no services,
+  no activities, nothing user-launchable — and served from droidjev's own
+  GitHub Releases over HTTPS, the same trust chain that delivers the droidjev
+  binary (~13 KB, one APK). Downloads are cached under
+  `~/.cache/droidjev/instrument/` with the release tag in the cache key, so a
+  stale or tampered cached file can never install; third-party assets, if
+  ever added, would additionally carry a mandatory committed SHA-256 verified
+  before install. Scope: a device that already has the package installed is
+  used as-is.
 - **Screen content is data, not instructions.** The prompt labels element text
   and `recent_actions` as untrusted data, and the model cannot execute anything
   outside the validated option set anyway. Residual risk: a hostile page could

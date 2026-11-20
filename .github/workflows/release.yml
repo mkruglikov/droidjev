@@ -20,9 +20,26 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o "droidjev-${VERSION}-darwin-arm64" .
           shasum -a 256 "droidjev-${VERSION}-darwin-arm64" > "droidjev-${VERSION}-darwin-arm64.sha256"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: build the signed instrumentation APK and checksum
+        env:
+          DROIDJEV_KEYSTORE_B64: ${{ secrets.DROIDJEV_KEYSTORE_B64 }}
+          DROIDJEV_KEYSTORE_PASSWORD: ${{ secrets.DROIDJEV_KEYSTORE_PASSWORD }}
+          DROIDJEV_KEY_ALIAS: ${{ secrets.DROIDJEV_KEY_ALIAS }}
+          DROIDJEV_BUILD_TOOLS: '36.0.0'
+          DROIDJEV_PLATFORM: 'android-35'
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager "build-tools;36.0.0" "platforms;android-35" > /dev/null
+          instrument/build.sh
+          mv instrument/droidjev-instrument.apk .
+          shasum -a 256 droidjev-instrument.apk > droidjev-instrument.apk.sha256
       - name: upload release assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          gh release upload "$GITHUB_REF_NAME" "droidjev-${VERSION}-darwin-arm64" "droidjev-${VERSION}-darwin-arm64.sha256" --clobber
+          gh release upload "$GITHUB_REF_NAME" "droidjev-${VERSION}-darwin-arm64" "droidjev-${VERSION}-darwin-arm64.sha256" "droidjev-instrument.apk" "droidjev-instrument.apk.sha256" --clobber

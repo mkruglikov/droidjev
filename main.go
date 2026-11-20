@@ -266,9 +266,9 @@ func printJSON(v any) error {
 	return enc.Encode(v)
 }
 
-// withUia2 ensures the resident uia2 server, then runs fn. The server stays
+// withLayout ensures the resident layout provider, then runs fn. The server stays
 // up across invocations (boot costs ~1.2s).
-func withUia2(serial string, fn func() error) error {
+func withLayout(serial string, fn func() error) error {
 	if err := Ensure(serial); err != nil {
 		return err
 	}
@@ -379,7 +379,7 @@ func cmdSnapshot(f Flags) (int, error) {
 		return 0, err
 	}
 	var s *Snapshot
-	if err := withUia2(res.Serial, func() error {
+	if err := withLayout(res.Serial, func() error {
 		var err error
 		s, err = TakeSnapshot(res.Serial)
 		return err
@@ -467,7 +467,7 @@ func cmdFind(f Flags) (int, error) {
 		maxIterations = 20
 	}
 	var found FindResult
-	if err := withUia2(res.Serial, func() error {
+	if err := withLayout(res.Serial, func() error {
 		var err error
 		found, err = FindLabel(FindOpts{
 			Serial:        res.Serial,
@@ -617,7 +617,7 @@ func cmdAct(f Flags) (int, error) {
 		opts.MaxSteps = 32
 	}
 	var result GoalResult
-	runErr := withUia2(res.Serial, func() error {
+	runErr := withLayout(res.Serial, func() error {
 		if f.NoAnimations {
 			return WithAnimationsOff(res.Serial, func() error {
 				var err error

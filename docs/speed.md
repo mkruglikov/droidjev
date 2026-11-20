@@ -3,8 +3,8 @@
 | cost | typical (Pixel-class AVD) |
 |---|---|
 | `adb devices` | ~14 ms |
-| first dump after server boot (start + session) | ~1.2 s, once — the server stays resident |
-| layout dump (resident uia2 server) | **~20–50 ms** |
+| first dump after instrumentation start | ~1.5–2.5 s, once — it stays resident |
+| layout dump (resident instrumentation) | **~18–40 ms** |
 | TypeSafe request (connection pre-warmed) | ~0.3–0.4 s |
 | `adb shell input tap` | ~0.1–0.3 s |
 | post-action settle | adaptive: ~2 dumps (~120 ms) on a still screen, up to 600 ms under entry animations |
@@ -15,15 +15,15 @@
 
 The hot loop never spawns anything but `adb`; AVD auto-boots (cold path)
 spawn the SDK `emulator` binary directly — no `android` CLI anywhere. Layout
-dumps come from one engine: a resident
-[appium-uiautomator2-server](https://github.com/appium/appium-uiautomator2-server)
-— a persistent on-device instrumentation holding the accessibility
-connection, queried over an adb-forwarded HTTP port, so a dump is one local
-call (~50 ms) instead of a ~1.1 s CLI spawn. The three APKs (server, test,
-settings companion) are downloaded and installed on first use (~21 MB, cached
-in `~/.cache/droidjev`); the first droidjev command starts the server and
-leaves it **resident across commands** — later commands skip the ~1.2 s boot.
-UiAutomation is exclusive device-wide: while the server lives, other resident
-instrumentations (e.g. the `android` CLI's layout tool, if you still use it)
-stay displaced (`adb shell am force-stop
-io.appium.uiautomator2.server` hands it back).
+dumps come from one engine: a resident first-party instrumentation APK
+(`instrument/` in the repo, ~13 KB, served from droidjev's own releases) —
+a persistent on-device instrumentation holding the accessibility connection,
+queried over an adb-forwarded abstract unix socket, so a dump is one local
+call (~20 ms measured) instead of a ~1.1 s CLI spawn. The APK is downloaded
+and installed on first use (cached in `~/.cache/droidjev/instrument`); the
+first droidjev command starts the instrumentation and leaves it **resident
+across commands** — later commands skip the ~1.5–2.5 s start.
+UiAutomation is exclusive device-wide: while it lives, other resident
+instrumentations (the `android` CLI's layout tool, or an older droidjev's
+appium server) stay displaced — both are force-stopped on start
+(`adb shell am force-stop dev.droidjev.instrument` hands it back).

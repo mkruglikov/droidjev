@@ -1,14 +1,16 @@
-// Tests for the resident uia2 server lifecycle. Everything here is offline:
-// port allocation, hash verification, and the pinned-APK install pipeline with
-// its fetch/cache/adb seams injected. Ensure/Source/SetClipboard/Stop drive a
-// real device and stay untested.
+// Tests for the resident instrumentation lifecycle. Everything here is
+// offline: port allocation, hash verification, the pinned-APK install pipeline
+// with its fetch/cache/adb seams injected, and the socket protocol codec.
+// Ensure/Source/SetClipboard/Stop drive a real device and stay untested.
 package main
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -249,5 +251,107 @@ func TestInstallApkAdbFailure(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "adb install of helper.apk failed: Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE]") {
 		t.Fatalf("error = %q", err.Error())
+	}
+}
+
+// --- socket protocol codec ---
+
+// instrTestServe stands in for the on-device instrumentation: answers the
+// line protocol on one accepted connection.
+func instrTestServe(t *testing.T, ln net.Listener, handler func(req string) string) {
+	t.Helper()
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				req, err := readLine(c)
+				if err != nil {
+					return
+				}
+				if _, err := c.Write([]byte(handler(req))); err != nil {
+					return
+				}
+			}(conn)
+		}
+	}()
+}
+
+// instrTestSession points a fake serial at a free local port.
+func instrTestSession(t *testing.T, port int) {
+	t.Helper()
+	instrMu.Lock()
+	instrSessions["test-serial"] = &Session{Port: port}
+	instrMu.Unlock()
+	t.Cleanup(func() {
+		instrMu.Lock()
+		delete(instrSessions, "test-serial")
+		instrMu.Unlock()
+	})
+}
+
+func TestInstrRpcPingDumpClip(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	instrTestSession(t, ln.Addr().(*net.TCPAddr).Port)
+	instrTestServe(t, ln, func(req string) string {
+		switch {
+		case req == "PING":
+			return "OK 1\n"
+		case req == "DUMP":
+			return fmt.Sprintf("%d\n%s", len("<hierarchy/>"), "<hierarchy/>")
+		case strings.HasPrefix(req, "CLIP "):
+			if decoded, err := base64.StdEncoding.DecodeString(req[5:]); err == nil && string(decoded) == "hi Ж" {
+				return "OK\n"
+			}
+			return "ERR bad base64\n"
+		default:
+			return "ERR unknown command\n"
+		}
+	})
+
+	if head, _, err := instrRpc("test-serial", "PING", 2000, false); err != nil || head != "OK 1" {
+		t.Fatalf("PING = %q, %v", head, err)
+	}
+	head, body, err := instrRpc("test-serial", "DUMP", 2000, true)
+	if err != nil || string(body) != "<hierarchy/>" {
+		t.Fatalf("DUMP = %q %q, %v", head, body, err)
+	}
+	if head, _, err := instrRpc("test-serial", "CLIP "+base64.StdEncoding.EncodeToString([]byte("hi Ж")), 2000, false); err != nil || head != "OK" {
+		t.Fatalf("CLIP = %q, %v", head, err)
+	}
+	if head, _, err := instrRpc("test-serial", "CLIP !!!", 2000, false); err != nil || head != "ERR bad base64" {
+		t.Fatalf("bad CLIP = %q, %v", head, err)
+	}
+	if head, _, err := instrRpc("test-serial", "WHAT", 2000, false); err != nil || head != "ERR unknown command" {
+		t.Fatalf("unknown = %q, %v", head, err)
+	}
+}
+
+func TestInstrRpcBadDumpHeader(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	instrTestSession(t, ln.Addr().(*net.TCPAddr).Port)
+	instrTestServe(t, ln, func(string) string { return "not-a-number\n" })
+	if _, _, err := instrRpc("test-serial", "DUMP", 2000, true); err == nil {
+		t.Fatal("expected a framing error")
+	}
+}
+
+func TestAssetVersionKey(t *testing.T) {
+	if got := assetVersionKey(PinnedAsset{URL: "https://x/y.apk", Sha256: "abcdef1234"}); got != "abcdef12" {
+		t.Fatalf("sha key = %q", got)
+	}
+	if got := assetVersionKey(PinnedAsset{URL: "https://github.com/o/r/releases/download/v0.6.0/droidjev-instrument.apk"}); got != "v0.6.0" {
+		t.Fatalf("tag key = %q", got)
 	}
 }
