@@ -78,8 +78,9 @@ binary.
 3. **Verify:** `droidjev devices` — with an emulator up it lists it;
    `no devices online` is fine too (`droidjev boot` boots the first AVD).
 
-The first `snapshot`/`find`/`act` downloads appium-uiautomator2-server
-(~21 MB, three APKs) onto the emulator and starts a resident server — see
+The first `snapshot`/`find`/`act` downloads the droidjev instrumentation APK
+(~13 KB, built from this repository, served from droidjev's own releases)
+onto the emulator and starts a resident layout server — see
 [How it works](https://github.com/mkruglikov/droidjev/blob/master/docs/how-it-works.md).
 
 ## Install the AI skill
@@ -164,7 +165,7 @@ step taken so far.
 
 - **[How it works](https://github.com/mkruglikov/droidjev/blob/master/docs/how-it-works.md)** —
   the agent loop, the numbered element table, copy/paste, cross-locale
-  matching, and the resident uiautomator2 server.
+  matching, and the resident instrumentation server.
 - **[Speed](https://github.com/mkruglikov/droidjev/blob/master/docs/speed.md)** —
   per-step cost table and where the milliseconds go.
 - **[Security model](https://github.com/mkruglikov/droidjev/blob/master/docs/security.md)** —

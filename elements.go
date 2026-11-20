@@ -27,14 +27,15 @@ const (
 
 var chromePkgs = map[string]bool{"com.android.systemui": true}
 
-// Automation companions droidjev itself installs (the io.appium.settings
-// clipboard helper, the uiautomator2 server) show up on the launcher as
-// ordinary app icons — a goal saying "open Settings" then matches "Appium
-// Settings" literally. They are never a legitimate target.
+// Automation companions droidjev itself installs: appium's stack from older
+// versions (still on many devices, launcher icons and all) and our own
+// instrumentation APK (defensive: it has no activity, so it never shows one).
+// They are never a legitimate target.
 var helperPkgs = map[string]bool{
 	"io.appium.settings":                 true,
 	"io.appium.uiautomator2.server":      true,
 	"io.appium.uiautomator2.server.test": true,
+	"dev.droidjev.instrument":            true,
 }
 
 var (

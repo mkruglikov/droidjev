@@ -23,3 +23,30 @@ jobs:
 
       - name: cross-compile the release target
         run: GOOS=darwin GOARCH=arm64 go build -o /dev/null .
+
+  # The instrumentation APK builds from the raw SDK tools on every push: no
+  # Gradle, no wrapper — javac + d8 + aapt2 + zipalign + apksigner (see
+  # instrument/build.sh). Signed with a throwaway debug keystore here; the
+  # release job signs with the release key from repo secrets.
+  instrument-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: install android build tools
+        run: |
+          SDKMANAGER="$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | tail -1)"
+          yes | "$SDKMANAGER" --licenses > /dev/null
+          "$SDKMANAGER" "build-tools;36.0.0" "platforms;android-35" > /dev/null
+      - name: build the instrumentation APK
+        run: instrument/build.sh
+        env:
+          DROIDJEV_BUILD_TOOLS: '36.0.0'
+          DROIDJEV_PLATFORM: 'android-35'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: droidjev-instrument-apk
+          path: instrument/droidjev-instrument.apk

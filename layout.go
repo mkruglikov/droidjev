@@ -1,5 +1,5 @@
-// Layout: the UI hierarchy dump from the resident appium-uiautomator2-server.
-// A dump is one adb-forwarded HTTP call; the server is installed on first use
+// Layout: the UI hierarchy dump from the resident own instrumentation.
+// A dump is one adb-forwarded socket call; the APK is installed on first use
 // and kept resident across commands.
 //
 // The tokenizer is hand-written on
@@ -298,14 +298,14 @@ type Layout struct {
 	RootPkg  string
 }
 
-// uia2Source is the dump seam: production is uia2.go's resident-server Source;
+// layoutSource is the dump seam: production is instr.go's resident-instrument Source;
 // tests replace it so GetLayout runs without a device.
-var uia2Source = Source
+var layoutSource = Source
 
 // GetLayout dumps and parses the hierarchy once.
 func GetLayout(serial string) (*Layout, error) {
 	t0 := time.Now()
-	xml, err := uia2Source(serial)
+	xml, err := layoutSource(serial)
 	if err != nil {
 		return nil, err
 	}

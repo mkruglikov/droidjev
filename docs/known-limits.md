@@ -26,3 +26,12 @@
   `--device`.
 - `--trace` files contain the goal and on-screen values; they live only under
   `~/.cache/droidjev/runs/` (mode 0600) and are never written inside the repo.
+- Dumps include every window with accessibility nodes (the old appium
+  provider exposed only the active one), so on soft-keyboard AVDs an open
+  IME's keys can appear as rows — the prompts already treat them as a foreign
+  keyboard's keys.
+- The instrumentation writes the device clipboard (that is all `copy`/
+  `paste` need) but never reads it: Android 10+ restricts clipboard reads to
+  the default IME or the focused app, and droidjev is neither. A future read
+  would need the default-IME switch dance (documented in
+  docs/plans/own-instrumentation-apk.md).

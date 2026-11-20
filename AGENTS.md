@@ -2,7 +2,7 @@
 
 Zero-dependency Go CLI (stdlib only, single `package main`) that automates
 Android emulators text-first: dumps the view hierarchy via a resident
-appium-uiautomator2-server, asks the TypeSafe jev model which indexed element
+first-party instrumentation APK, asks the TypeSafe jev model which indexed element
 advances the goal, taps it via `adb`, verifies the screen changed. Screenshots
 are sent to the model only as a blind-screen fallback (see `shot.go`). Released
 as a static darwin/arm64 binary through GitHub Releases — see Releasing.
@@ -48,8 +48,11 @@ go run . <cmd>                # run the CLI in place
 - `act.go` — executor: validated decision → adb input. Owns
   `SanitizeInputText` (the shell-inert `--text` charset). WAKE_UP rides in the
   same adb invocation as each gesture (doze-proof input).
-- `uia2.go` — resident uia2-server lifecycle (download/install/start, HTTP
-  over an adb-forwarded port; APKs cached in `~/.cache/droidjev`).
+- `instr.go` — resident instrumentation lifecycle (download/install/start,
+  PING/DUMP/CLIP line protocol over an adb-forwarded abstract socket; APK
+  cached in `~/.cache/droidjev/instrument`). `instrument/` — the APK's Java
+  source (Runner/XmlDump) + manifest + no-Gradle build (`build.sh`:
+  javac/d8/aapt2/apksigner).
 - `layout.go` / `elements.go` — parse uia2 XML → numbered element table,
   hierarchy hash, scroll anchor. One dump per step; the settle polls dumps until
   two consecutive hashes match.
@@ -132,10 +135,10 @@ go run . <cmd>                # run the CLI in place
   `~/.cache/droidjev/emulator-*.log`; an early exit fails fast with the log
   tail). It is found via PATH, `$ANDROID_HOME`, `$ANDROID_SDK_ROOT`, or the
   default SDK locations — there is no `android` CLI dependency anymore.
-- UiAutomation is exclusive device-wide: the resident uia2 server displaces any
-  other resident instrumentation (e.g. the `android` CLI's, if the operator
-  still uses it) — `adb shell am force-stop io.appium.uiautomator2.server`
-  hands it back.
+- UiAutomation is exclusive device-wide: the resident instrumentation
+  displaces any other (the `android` CLI's, an older droidjev's appium
+  server — both are force-stopped on start) — `adb shell am force-stop
+  dev.droidjev.instrument` hands it back.
 - Clipboard writes can't change the hierarchy — copy steps skip the settle and
   re-dump entirely (`copy_<idx>`/`paste` ops).
 - `find` scrolls to the top of the list first (an up-scroll that changes

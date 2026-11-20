@@ -328,10 +328,10 @@ func TestParseNoHierarchyErrors(t *testing.T) {
 }
 
 func TestGetLayout(t *testing.T) {
-	orig := uia2Source
-	defer func() { uia2Source = orig }()
+	orig := layoutSource
+	defer func() { layoutSource = orig }()
 
-	uia2Source = func(serial string) (string, error) {
+	layoutSource = func(serial string) (string, error) {
 		if serial != "emulator-5554" {
 			return "", NewDroidJevError("unexpected serial " + serial)
 		}
@@ -356,7 +356,7 @@ func TestGetLayout(t *testing.T) {
 	}
 
 	boom := errors.New("dump failed")
-	uia2Source = func(string) (string, error) { return "", boom }
+	layoutSource = func(string) (string, error) { return "", boom }
 	if _, err := GetLayout("emulator-5554"); !errors.Is(err, boom) {
 		t.Errorf("GetLayout error = %v, want %v", err, boom)
 	}
@@ -366,13 +366,13 @@ const settleXMLA = `<hierarchy rotation="0"><node index="0" text="A" class="X" b
 const settleXMLB = `<hierarchy rotation="0"><node index="0" text="B" class="X" bounds="[0,0][10,10]"/></hierarchy>`
 
 func TestSettleLayout(t *testing.T) {
-	orig := uia2Source
-	defer func() { uia2Source = orig }()
+	orig := layoutSource
+	defer func() { layoutSource = orig }()
 
 	// A changed screen, then two identical dumps: the second B is the settle.
 	dumps := []string{settleXMLA, settleXMLB, settleXMLB}
 	calls := 0
-	uia2Source = func(string) (string, error) {
+	layoutSource = func(string) (string, error) {
 		if calls >= len(dumps) {
 			return "", NewDroidJevError("unexpected extra dump")
 		}
@@ -393,11 +393,11 @@ func TestSettleLayout(t *testing.T) {
 }
 
 func TestSettleLayoutDeadline(t *testing.T) {
-	orig := uia2Source
-	defer func() { uia2Source = orig }()
+	orig := layoutSource
+	defer func() { layoutSource = orig }()
 
 	calls := 0
-	uia2Source = func(string) (string, error) {
+	layoutSource = func(string) (string, error) {
 		calls++
 		return settleXMLA, nil
 	}
@@ -442,13 +442,13 @@ func settleTestClock() (restore func()) {
 // (an opening drawer is a pure translation) — the wait extends once and the
 // settled dump is the one where motion stopped.
 func TestSettleLayoutDrawer(t *testing.T) {
-	origSource, restoreClock := uia2Source, settleTestClock()
-	defer func() { uia2Source = origSource; restoreClock() }()
+	origSource, restoreClock := layoutSource, settleTestClock()
+	defer func() { layoutSource = origSource; restoreClock() }()
 
 	// A → translated (content stable, bounds moving) → final → final.
 	dumps := []string{settleXMLA, settleXMLMoved, settleXMLFinal, settleXMLFinal}
 	calls := 0
-	uia2Source = func(string) (string, error) {
+	layoutSource = func(string) (string, error) {
 		xml := dumps[calls]
 		calls++
 		return xml, nil
@@ -468,11 +468,11 @@ func TestSettleLayoutDrawer(t *testing.T) {
 // TestSettleLayoutFlingDeadline: content still changing at the deadline is
 // fling noise — the settle returns at the cap with no extension.
 func TestSettleLayoutFlingDeadline(t *testing.T) {
-	origSource, restoreClock := uia2Source, settleTestClock()
-	defer func() { uia2Source = origSource; restoreClock() }()
+	origSource, restoreClock := layoutSource, settleTestClock()
+	defer func() { layoutSource = origSource; restoreClock() }()
 
 	calls := 0
-	uia2Source = func(string) (string, error) {
+	layoutSource = func(string) (string, error) {
 		calls++
 		if calls == 1 {
 			return settleXMLA, nil
@@ -492,11 +492,11 @@ func TestSettleLayoutFlingDeadline(t *testing.T) {
 }
 
 func TestSettleLayoutError(t *testing.T) {
-	orig := uia2Source
-	defer func() { uia2Source = orig }()
+	orig := layoutSource
+	defer func() { layoutSource = orig }()
 
 	boom := errors.New("dump failed")
-	uia2Source = func(string) (string, error) { return "", boom }
+	layoutSource = func(string) (string, error) { return "", boom }
 	if _, err := SettleLayout("emulator-5554", 5000); !errors.Is(err, boom) {
 		t.Errorf("SettleLayout error = %v, want %v", err, boom)
 	}

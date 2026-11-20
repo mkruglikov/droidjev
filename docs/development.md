@@ -9,6 +9,10 @@ there are no external modules to fetch.
 go test ./...                 # unit tests (no network, no device)
 DROIDJEV_E2E=1 go test -run TestE2E -v ./...   # live e2e: real tokens + a
                                                # booted emulator (+ Chrome)
+                                               # (DROIDJEV_INSTRUMENT_APK=/path/to.apk
+                                               #  installs a local build of the
+                                               #  instrumentation instead of the
+                                               #  pinned release asset)
 go vet ./...
 gofmt -l .                    # empty output = formatted
 go build -o /tmp/droidjev .   # build a binary

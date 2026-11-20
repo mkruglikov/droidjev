@@ -86,7 +86,7 @@ be written in the UI's language.
 - **`copy_<idx>` copies text that cannot be selected.** Static labels (the
   "17" next to "Android version") have no long-press copy menu; the model
   picks the value row and its exact text goes to the device clipboard through
-  the resident uia2 server — any Unicode, no shell, no typing, capped at the
+  the resident instrumentation — any Unicode, no shell, no typing, capped at the
   same 500 chars as `--text`. A clipboard write cannot change the view
   hierarchy, so a copy step skips the settle and re-dump entirely. The `paste`
   op completes the round trip: after a copy this run, the model taps a field,
@@ -126,12 +126,15 @@ be written in the UI's language.
 
 ## First run on a device
 
-First layout use (`snapshot`/`find`/`act`) downloads
-appium-uiautomator2-server plus its io.appium.settings companion (~21 MB,
-three APKs, pinned release URLs verified against committed SHA-256 digests)
-onto the emulator and starts a server that stays resident across
-commands. The helper APKs are never a tap target: every element table hides
-them and their launcher icons — an icon literally labeled "Appium Settings"
-otherwise traps "open Settings" goals. Missing runtime prerequisites fail
+First layout use (`snapshot`/`find`/`act`) downloads the droidjev
+instrumentation APK (~13 KB; built from this repository by CI, served from
+droidjev's own GitHub Releases) onto the emulator and starts a resident
+instrumentation that holds the accessibility connection and answers dumps
+over a per-device abstract unix socket — resident across commands. Older
+droidjev versions installed appium's uiautomator2 stack (~21 MB, three
+third-party APKs); a leftover server is force-stopped when ours starts, and
+its packages (launcher icons included — an icon literally labeled "Appium
+Settings" otherwise traps "open Settings" goals) stay hidden from element
+tables. Missing runtime prerequisites fail
 fast with a warning that names the fix — before any emulator boot or API
 call — and the tool stops (exit 3).

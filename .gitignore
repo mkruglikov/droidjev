@@ -4,3 +4,9 @@
 
 docs/superpowers/
 /droidjev
+instrument/build/
+instrument/droidjev-instrument.apk
+instrument/debug.keystore
+instrument/*.idsig
+droidjev-release.keystore
+droidjev-release.keystore.b64
