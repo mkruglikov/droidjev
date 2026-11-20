@@ -127,11 +127,15 @@ go run . <cmd>                # run the CLI in place
   and running `test/golden-generate.mjs` there.
 - `UTF16Truncate` drops a straddled surrogate pair whole (the emoji is removed,
   not halved) — a deliberate choice recorded in docs/known-limits.md.
-- The hot loop must never shell out to the `android` CLI (~670 ms startup tax);
-  raw adb only. The `android` CLI is used solely to boot an AVD.
-- UiAutomation is exclusive device-wide: the resident uia2 server displaces the
-  `android` CLI's layout instrumentation
-  (`adb shell am force-stop io.appium.uiautomator2.server` hands it back).
+- The hot loop is raw adb only. The SDK `emulator` binary is the sole non-adb
+  subprocess, spawned detached on the cold AVD-boot path (`-gpu host`, log under
+  `~/.cache/droidjev/emulator-*.log`; an early exit fails fast with the log
+  tail). It is found via PATH, `$ANDROID_HOME`, `$ANDROID_SDK_ROOT`, or the
+  default SDK locations — there is no `android` CLI dependency anymore.
+- UiAutomation is exclusive device-wide: the resident uia2 server displaces any
+  other resident instrumentation (e.g. the `android` CLI's, if the operator
+  still uses it) — `adb shell am force-stop io.appium.uiautomator2.server`
+  hands it back.
 - Clipboard writes can't change the hierarchy — copy steps skip the settle and
   re-dump entirely (`copy_<idx>`/`paste` ops).
 - `find` scrolls to the top of the list first (an up-scroll that changes

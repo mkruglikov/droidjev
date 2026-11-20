@@ -14,8 +14,10 @@ emulator is fine: it auto-boots the first AVD (adds ~30–60s).
 
 **How to invoke:** run the `droidjev` binary if it is on PATH (`droidjev …`);
 from a checkout without installing, run `go run . …` with the DroidJev
-repository as the working directory. Requires `adb`, the `android` CLI on
-PATH, and `TYPESAFE_API_KEY` in the environment. Missing prerequisites produce
+repository as the working directory. Requires `adb` on PATH, the SDK
+`emulator` binary (only when droidjev must boot an AVD itself; found via
+PATH/`$ANDROID_HOME`/`$ANDROID_SDK_ROOT`/the default SDK location), and
+`TYPESAFE_API_KEY` in the environment. Missing prerequisites produce
 a clear warning and stop — fix what they name, do not work around them.
 
 ## Preferred usage: ONE act call with the full flow
@@ -65,7 +67,7 @@ Trust `status=done` — the model answers done only when the current screen
 shows the goal achieved, and `app=` shows the focused app.
 
 Exit codes: `0` done/found · `2` blocked/not found · `3` error (missing adb,
-missing android CLI where needed, missing TYPESAFE_API_KEY, no AVD).
+missing SDK emulator binary where needed, missing TYPESAFE_API_KEY, no AVD).
 
 ## Flags
 

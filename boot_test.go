@@ -3,7 +3,12 @@
 // config.ini text is repinned to the host GPU.
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
 // keyguardDumpUnlocked is the KeyguardServiceDelegate block of a live
 // emulator's `dumpsys window policy` while unlocked (API 36). The near-name
@@ -125,5 +130,60 @@ func TestPinHostGpuIni(t *testing.T) {
 		if got := PinHostGpuIni(c.in); got != c.want {
 			t.Errorf("%s: PinHostGpuIni(%q) = %q, want %q", c.name, c.in, got, c.want)
 		}
+	}
+}
+
+func TestEmulatorCandidates(t *testing.T) {
+	got := emulatorCandidates([]string{"", "/opt/sdk", "x"})
+	want := []string{
+		filepath.Join("/opt/sdk", "emulator", emulatorBinName),
+		filepath.Join("x", "emulator", emulatorBinName),
+	}
+	if len(got) != len(want) {
+		t.Fatalf("emulatorCandidates = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("emulatorCandidates[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestPickEmulatorPath(t *testing.T) {
+	dir := t.TempDir()
+	missing := filepath.Join(dir, "nope")
+	hit := filepath.Join(dir, "hit")
+	if err := os.WriteFile(hit, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sub := filepath.Join(dir, "sub") // a directory must never win
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := pickEmulatorPath([]string{missing, hit, sub}); got != hit {
+		t.Errorf("pickEmulatorPath = %q, want %q", got, hit)
+	}
+	if got := pickEmulatorPath(nil); got != "" {
+		t.Errorf("pickEmulatorPath(nil) = %q, want empty", got)
+	}
+}
+
+func TestLogTail(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "emulator.log")
+	if got := logTail(filepath.Join(dir, "absent.log")); got != "" {
+		t.Errorf("logTail of a missing file = %q, want empty", got)
+	}
+	long := strings.Repeat("x", logTailBytes+50) + "\nfatal: no GPU, goodbye\n"
+	if err := os.WriteFile(p, []byte(long), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := logTail(p)
+	// The exact prefix of x's is uninteresting; assert the tail line and cap.
+	if !strings.HasSuffix(got, "fatal: no GPU, goodbye") {
+		t.Errorf("logTail = %q, want it to end with the fatal line", got)
+	}
+	if len(got) > logTailBytes {
+		t.Errorf("logTail len = %d, want <= %d", len(got), logTailBytes)
 	}
 }

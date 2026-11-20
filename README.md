@@ -43,11 +43,13 @@ that code resolves to the tap point (`--no-vision` keeps even that off).
 1. **`adb`** (Android platform-tools) — required by every device command.
    Install: `brew install --cask android-platform-tools`.
    Verify: `adb version`.
-2. **`android` CLI** — optional; needed only when droidjev must boot an AVD
-   itself (no emulator online, `boot`, or `--device <avd>`). Skip it if you
-   start emulators yourself.
-   Install: [developer.android.com/cli](https://developer.android.com/cli/install).
-   Verify: `android emulator list` prints your AVDs.
+2. **SDK `emulator` binary** — optional; needed only when droidjev must boot
+   an AVD itself (no emulator online, `boot`, or `--device <avd>`). Found via
+   `PATH`, `$ANDROID_HOME`, `$ANDROID_SDK_ROOT`, or the default SDK location;
+   it ships wherever AVDs come from (Android Studio bundles it). Skip it if
+   you start emulators yourself.
+   Install: SDK Manager → "Android Emulator" (or `sdkmanager --install "emulator"`).
+   Verify: `emulator -list-avds` prints your AVDs.
 
 macOS on Apple Silicon needs nothing else — the release is a single static
 binary.
