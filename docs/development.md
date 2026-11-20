@@ -1,16 +1,23 @@
 # Development
 
 From a checkout: `git clone https://github.com/mkruglikov/droidjev`, then run
-`./src/cli.js` in place — Node ≥ 20 is all it needs, there is nothing to build.
+`go run .` in place — Go ≥ 1.27.4 (the floor `go.mod` pins) and the standard
+library are all it needs;
+there are no external modules to fetch.
 
 ```bash
-npm test          # unit tests (no network, no device)
-npm run lint      # pinned eslint via npx — nothing installed
-for f in src/*.js; do node --check "$f"; done   # syntax check — node --check
-                                                # validates one file, a bare
-                                                # src/*.js glob checks only
-                                                # the first
+go test ./...                 # unit tests (no network, no device)
+DROIDJEV_E2E=1 go test -run TestE2E -v ./...   # live e2e: real tokens + a
+                                               # booted emulator (+ Chrome)
+go vet ./...
+gofmt -l .                    # empty output = formatted
+go build -o /tmp/droidjev .   # build a binary
 ```
+
+The prompt goldens under `testdata/golden/` are byte-equality gates: every
+question droidjev builds is compared with the fixture. They are never
+regenerated in CI; changing a prompt string means updating the matching fixture
+deliberately.
 
 `--trace` (or `DROIDJEV_TRACE=1`) records a run to
 `~/.cache/droidjev/runs/` as JSONL. These are local diagnostics for one

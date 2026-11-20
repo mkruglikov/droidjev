@@ -1,0 +1,32 @@
+{
+  "operation": {
+    "type": "choice",
+    "instructions": {
+      "question": "The element list is empty: this screen exposes no accessibility nodes (a web page or custom renderer), so the screenshot in state.screenshot is the only view of it. Pick the single next action that best advances the goal.",
+      "rules": [
+        "tap_box taps the on-screen element the tap_target answer marks — a link, a button, a field, an image acting as a control. Judge by what is VISIBLE in the screenshot, matching the goal by meaning (the goal and the page may be in different languages).",
+        "scroll_down/scroll_up move the page when the target is probably just out of view; back leaves this page for the one before it; home returns to the launcher, whose element list is readable again.",
+        "Choose done only when the screenshot itself shows the goal achieved.",
+        "Choose blocked only when nothing on this screen can lead to the goal."
+      ]
+    },
+    "criteria": {
+      "tap_box": "Tap the element the tap_target box marks — the visible control that best advances the goal",
+      "scroll_down": "Scroll down — the target is probably further down the page",
+      "scroll_up": "Scroll up — the target is probably higher on the page",
+      "back": "Leave this page for the one before it",
+      "home": "Return to the home screen",
+      "wait": "The page is still loading; act next step",
+      "done": "The goal is already achieved, as shown in the screenshot",
+      "blocked": "No action on this screen can achieve the goal"
+    }
+  },
+  "screen_readable": {
+    "type": "noul",
+    "instructions": "Does the screenshot in state.screenshot show a rendered screen with content (text, controls, images) rather than a blank, black or off display?"
+  },
+  "tap_target": {
+    "type": "box",
+    "instructions": "The single element in `3f2504e0-4f89-11d3-9a0c-0305e82c3301` to tap next to advance the goal (this answer is used only when the operation choice is tap_box)"
+  }
+}

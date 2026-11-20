@@ -40,30 +40,37 @@ that code resolves to the tap point (`--no-vision` keeps even that off).
 
 ## Prerequisites
 
-1. **Node.js ≥ 20** — required for everything; droidjev has zero npm
-   dependencies.
-   Install: `brew install node` · `nvm install 20` · [nodejs.org](https://nodejs.org).
-   Verify: `node -v` prints `v20` or newer.
-2. **`adb`** (Android platform-tools) — required by every device command.
+1. **`adb`** (Android platform-tools) — required by every device command.
    Install: `brew install --cask android-platform-tools`.
    Verify: `adb version`.
-3. **`android` CLI** — optional; needed only when droidjev must boot an AVD
+2. **`android` CLI** — optional; needed only when droidjev must boot an AVD
    itself (no emulator online, `boot`, or `--device <avd>`). Skip it if you
    start emulators yourself.
    Install: [developer.android.com/cli](https://developer.android.com/cli/install).
    Verify: `android emulator list` prints your AVDs.
 
+macOS on Apple Silicon needs nothing else — the release is a single static
+binary.
+
 ## Installation
 
-1. **`TYPESAFE_API_KEY`** — `act` and `check` talk to the model.
+1. **`TYPESAFE_API_KEY`** — `act`, `check` and `decide` talk to the model.
    Get a key at [docs.typesafe.ai](https://docs.typesafe.ai), then add
    `export TYPESAFE_API_KEY=…` to your shell profile.
-2. **droidjev itself** — from npm (zero deps, exactly one package), or try it
-   without installing:
+2. **droidjev itself** — download the latest macOS (Apple Silicon) build from
+   the [GitHub Releases page](https://github.com/mkruglikov/droidjev/releases),
+   or, for `v0.5.0`:
    ```bash
-   npm install -g droidjev
-   npx droidjev devices            # no global install needed
+   curl -L https://github.com/mkruglikov/droidjev/releases/download/v0.5.0/droidjev-0.5.0-darwin-arm64.tar.gz | tar xz
+   sudo install -m 755 droidjev /usr/local/bin/   # or /opt/homebrew/bin on Apple Silicon
    ```
+   Each tarball ships with a `.sha256` file; download it too and verify with
+   `shasum -a 256 -c droidjev-0.5.0-darwin-arm64.tar.gz.sha256`. On another
+   OS/architecture, build from source — see
+   [Development](https://github.com/mkruglikov/droidjev/blob/master/docs/development.md).
+   A tarball downloaded through a browser keeps the Gatekeeper quarantine
+   attribute and may be refused on first run; the `curl | tar` form above does
+   not carry it, and code signing is a stated non-goal.
 3. **Verify:** `droidjev devices` — with an emulator up it lists it;
    `no devices online` is fine too (`droidjev boot` boots the first AVD).
 
@@ -99,7 +106,8 @@ droidjev devices                 list emulators with AVD names (raw adb, ~15ms)
 droidjev boot [avd]              ensure an emulator is booted (auto-picks first AVD)
 droidjev start <package>         launch an app by package (deterministic, no model)
 droidjev snapshot [--grep "…"]   indexed element table of the current screen (no model)
-droidjev find "<label>" [--tap]  deterministically search scrollable content top-down
+droidjev find "<label>" [--tap]  deterministically search scrollable content
+                                (scrolls to the top first, then scans down)
                                  for a label and optionally tap it (~0.6s/iteration,
                                  no tokens); stops as soon as scrolling provably cannot help
 droidjev act "<goal>" [flags]    run the agent loop until done/blocked/answered
@@ -158,10 +166,10 @@ step taken so far.
 - **[Security model](https://github.com/mkruglikov/droidjev/blob/master/docs/security.md)** —
   API-key handling, subprocess spawning, and model-answer validation.
 - **[Known limits](https://github.com/mkruglikov/droidjev/blob/master/docs/known-limits.md)** —
-  blind screens and the vision fallback, ASCII-only typing, top-down `find`,
+  blind screens and the vision fallback, ASCII-only typing,
   emulator-first targeting.
 - **[Development](https://github.com/mkruglikov/droidjev/blob/master/docs/development.md)** —
-  running from a checkout, tests, lint.
+  building from source, tests, formatting.
 
 ## License
 

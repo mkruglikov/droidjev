@@ -1,0 +1,3536 @@
+[
+  {
+    "kind": "questions",
+    "name": "settings-plain",
+    "input": {
+      "texts": [],
+      "apps": [],
+      "copied": false,
+      "clipboardReady": false,
+      "canScroll": true,
+      "launcher": false,
+      "answers": false,
+      "clipboard": true,
+      "recentChoices": [],
+      "recentActions": [],
+      "lastUnchanged": null,
+      "today": null,
+      "guidance": [],
+      "verificationNote": null,
+      "tableTruncated": false,
+      "tableGrid": null,
+      "elements": [
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.android.systemui",
+          "text": "15:34",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 20,
+            "t": 10,
+            "r": 220,
+            "b": 60
+          },
+          "center": {
+            "x": 120,
+            "y": 35
+          },
+          "offScreen": false,
+          "parentIdx": -1
+        },
+        {
+          "class": "androidx.recyclerview.widget.RecyclerView",
+          "pkg": "com.android.settings",
+          "text": "",
+          "resourceId": "com.android.settings:id/list",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 100,
+            "r": 1080,
+            "b": 2300
+          },
+          "center": {
+            "x": 540,
+            "y": 1200
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "scrollable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.android.settings",
+          "text": "Wi-Fi",
+          "resourceId": "com.android.settings:id/title",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 60,
+            "t": 300,
+            "r": 700,
+            "b": 380
+          },
+          "center": {
+            "x": 380,
+            "y": 340
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": false
+        },
+        {
+          "class": "android.widget.Switch",
+          "pkg": "com.android.settings",
+          "text": "",
+          "resourceId": "com.android.settings:id/switch_widget",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 900,
+            "t": 300,
+            "r": 1030,
+            "b": 380
+          },
+          "center": {
+            "x": 965,
+            "y": 340
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "checkable": true,
+          "checked": true,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.android.settings",
+          "text": "Сеть и интернет",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 60,
+            "t": 420,
+            "r": 700,
+            "b": 500
+          },
+          "center": {
+            "x": 380,
+            "y": 460
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.android.settings",
+          "text": "Bluetooth",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 60,
+            "t": 540,
+            "r": 700,
+            "b": 620
+          },
+          "center": {
+            "x": 380,
+            "y": 580
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.android.settings",
+          "text": "Android version",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 60,
+            "t": 660,
+            "r": 700,
+            "b": 720
+          },
+          "center": {
+            "x": 380,
+            "y": 690
+          },
+          "offScreen": false,
+          "parentIdx": -1
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.android.settings",
+          "text": "14",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 60,
+            "t": 730,
+            "r": 700,
+            "b": 790
+          },
+          "center": {
+            "x": 380,
+            "y": 760
+          },
+          "offScreen": false,
+          "parentIdx": -1
+        }
+      ],
+      "screen": {
+        "app": "com.android.settings",
+        "size": "1080x2400",
+        "w": 1080,
+        "h": 2400
+      },
+      "goal": "turn Wi-Fi off"
+    }
+  },
+  {
+    "kind": "questions",
+    "name": "form-name-phone",
+    "input": {
+      "texts": [
+        "Maria",
+        "+79001234567"
+      ],
+      "apps": [],
+      "copied": false,
+      "clipboardReady": false,
+      "canScroll": false,
+      "launcher": false,
+      "answers": false,
+      "clipboard": true,
+      "recentChoices": [],
+      "recentActions": [],
+      "lastUnchanged": null,
+      "today": null,
+      "guidance": [],
+      "verificationNote": null,
+      "tableTruncated": false,
+      "tableGrid": null,
+      "elements": [
+        {
+          "class": "android.widget.EditText",
+          "pkg": "com.android.contacts",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "First name",
+          "bounds": {
+            "l": 60,
+            "t": 200,
+            "r": 1020,
+            "b": 280
+          },
+          "center": {
+            "x": 540,
+            "y": 240
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.EditText",
+          "pkg": "com.android.contacts",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "Phone",
+          "bounds": {
+            "l": 60,
+            "t": 320,
+            "r": 1020,
+            "b": 400
+          },
+          "center": {
+            "x": 540,
+            "y": 360
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.Button",
+          "pkg": "com.android.contacts",
+          "text": "Save",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 800,
+            "t": 500,
+            "r": 1020,
+            "b": 580
+          },
+          "center": {
+            "x": 910,
+            "y": 540
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        }
+      ],
+      "screen": {
+        "app": "com.android.contacts",
+        "size": "1080x2400",
+        "w": 1080,
+        "h": 2400
+      },
+      "goal": "create a contact named Maria with phone +79001234567"
+    }
+  },
+  {
+    "kind": "questions",
+    "name": "launcher-apps",
+    "input": {
+      "texts": [],
+      "apps": [
+        "Chrome",
+        "Settings"
+      ],
+      "copied": false,
+      "clipboardReady": false,
+      "canScroll": true,
+      "launcher": true,
+      "answers": false,
+      "clipboard": true,
+      "recentChoices": [],
+      "recentActions": [],
+      "lastUnchanged": null,
+      "today": null,
+      "guidance": [],
+      "verificationNote": null,
+      "tableTruncated": false,
+      "tableGrid": null,
+      "elements": [
+        {
+          "class": "androidx.recyclerview.widget.RecyclerView",
+          "pkg": "com.google.android.apps.nexuslauncher",
+          "text": "",
+          "resourceId": "com.google.android.apps.nexuslauncher:id/workspace",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 100,
+            "r": 1080,
+            "b": 2200
+          },
+          "center": {
+            "x": 540,
+            "y": 1150
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "scrollable": true
+        },
+        {
+          "class": "android.widget.FrameLayout",
+          "pkg": "com.google.android.apps.nexuslauncher",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 50,
+            "t": 300,
+            "r": 250,
+            "b": 500
+          },
+          "center": {
+            "x": 150,
+            "y": 400
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.google.android.apps.nexuslauncher",
+          "text": "Chrome",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 60,
+            "t": 440,
+            "r": 240,
+            "b": 480
+          },
+          "center": {
+            "x": 150,
+            "y": 460
+          },
+          "offScreen": false,
+          "parentIdx": 1
+        },
+        {
+          "class": "android.widget.FrameLayout",
+          "pkg": "com.google.android.apps.nexuslauncher",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 300,
+            "t": 300,
+            "r": 500,
+            "b": 500
+          },
+          "center": {
+            "x": 400,
+            "y": 400
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.google.android.apps.nexuslauncher",
+          "text": "📷 Camera",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 310,
+            "t": 440,
+            "r": 490,
+            "b": 480
+          },
+          "center": {
+            "x": 400,
+            "y": 460
+          },
+          "offScreen": false,
+          "parentIdx": 3
+        },
+        {
+          "class": "android.widget.FrameLayout",
+          "pkg": "com.google.android.apps.nexuslauncher",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 550,
+            "t": 300,
+            "r": 750,
+            "b": 500
+          },
+          "center": {
+            "x": 650,
+            "y": 400
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.google.android.apps.nexuslauncher",
+          "text": "Настройки",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 560,
+            "t": 440,
+            "r": 740,
+            "b": 480
+          },
+          "center": {
+            "x": 650,
+            "y": 460
+          },
+          "offScreen": false,
+          "parentIdx": 5
+        }
+      ],
+      "screen": {
+        "app": "com.google.android.apps.nexuslauncher",
+        "size": "1080x2400",
+        "w": 1080,
+        "h": 2400
+      },
+      "goal": "open Chrome"
+    }
+  },
+  {
+    "kind": "questions",
+    "name": "keypad-timer",
+    "input": {
+      "texts": [],
+      "apps": [],
+      "copied": false,
+      "clipboardReady": false,
+      "canScroll": false,
+      "launcher": false,
+      "answers": false,
+      "clipboard": true,
+      "recentChoices": [],
+      "recentActions": [],
+      "lastUnchanged": null,
+      "today": null,
+      "guidance": [],
+      "verificationNote": null,
+      "tableTruncated": false,
+      "tableGrid": null,
+      "elements": [
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.google.android.deskclock",
+          "text": "00:00:00",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 200,
+            "r": 1080,
+            "b": 400
+          },
+          "center": {
+            "x": 540,
+            "y": 300
+          },
+          "offScreen": false,
+          "parentIdx": -1
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.google.android.deskclock",
+          "text": "0",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1200,
+            "r": 200,
+            "b": 1400
+          },
+          "center": {
+            "x": 100,
+            "y": 1300
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.google.android.deskclock",
+          "text": "1",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 210,
+            "t": 1200,
+            "r": 410,
+            "b": 1400
+          },
+          "center": {
+            "x": 310,
+            "y": 1300
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.google.android.deskclock",
+          "text": "2",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 420,
+            "t": 1200,
+            "r": 620,
+            "b": 1400
+          },
+          "center": {
+            "x": 520,
+            "y": 1300
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.google.android.deskclock",
+          "text": "3",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 630,
+            "t": 1200,
+            "r": 830,
+            "b": 1400
+          },
+          "center": {
+            "x": 730,
+            "y": 1300
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.google.android.deskclock",
+          "text": "4",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 840,
+            "t": 1200,
+            "r": 1040,
+            "b": 1400
+          },
+          "center": {
+            "x": 940,
+            "y": 1300
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.google.android.deskclock",
+          "text": "5",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1420,
+            "r": 200,
+            "b": 1620
+          },
+          "center": {
+            "x": 100,
+            "y": 1520
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.google.android.deskclock",
+          "text": "6",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 210,
+            "t": 1420,
+            "r": 410,
+            "b": 1620
+          },
+          "center": {
+            "x": 310,
+            "y": 1520
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.google.android.deskclock",
+          "text": "7",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 420,
+            "t": 1420,
+            "r": 620,
+            "b": 1620
+          },
+          "center": {
+            "x": 520,
+            "y": 1520
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.google.android.deskclock",
+          "text": "8",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 630,
+            "t": 1420,
+            "r": 830,
+            "b": 1620
+          },
+          "center": {
+            "x": 730,
+            "y": 1520
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.google.android.deskclock",
+          "text": "9",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 840,
+            "t": 1420,
+            "r": 1040,
+            "b": 1620
+          },
+          "center": {
+            "x": 940,
+            "y": 1520
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        }
+      ],
+      "screen": {
+        "app": "com.google.android.deskclock",
+        "size": "1080x2340",
+        "w": 1080,
+        "h": 2340
+      },
+      "goal": "Create a timer with 0 hours, 16 minutes, and 35 seconds."
+    }
+  },
+  {
+    "kind": "questions",
+    "name": "route-from-to",
+    "input": {
+      "texts": [
+        "Moscow, ID",
+        "Saint-Petersburg, Russia"
+      ],
+      "apps": [],
+      "copied": false,
+      "clipboardReady": false,
+      "canScroll": false,
+      "launcher": false,
+      "answers": false,
+      "clipboard": true,
+      "recentChoices": [],
+      "recentActions": [],
+      "lastUnchanged": null,
+      "today": null,
+      "guidance": [],
+      "verificationNote": null,
+      "tableTruncated": false,
+      "tableGrid": null,
+      "elements": [
+        {
+          "class": "android.widget.EditText",
+          "pkg": "com.google.android.apps.maps",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "Choose starting point",
+          "bounds": {
+            "l": 40,
+            "t": 200,
+            "r": 1040,
+            "b": 280
+          },
+          "center": {
+            "x": 540,
+            "y": 240
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.EditText",
+          "pkg": "com.google.android.apps.maps",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "Choose destination",
+          "bounds": {
+            "l": 40,
+            "t": 300,
+            "r": 1040,
+            "b": 380
+          },
+          "center": {
+            "x": 540,
+            "y": 340
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.Button",
+          "pkg": "com.google.android.apps.maps",
+          "text": "Directions",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 800,
+            "t": 400,
+            "r": 1040,
+            "b": 480
+          },
+          "center": {
+            "x": 920,
+            "y": 440
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        }
+      ],
+      "screen": {
+        "app": "com.google.android.apps.maps",
+        "size": "1080x2340",
+        "w": 1080,
+        "h": 2340
+      },
+      "goal": "build a route from Moscow, ID to Saint-Petersburg, Russia."
+    }
+  },
+  {
+    "kind": "questions",
+    "name": "blocked-loop",
+    "input": {
+      "texts": [],
+      "apps": [],
+      "copied": false,
+      "clipboardReady": false,
+      "canScroll": false,
+      "launcher": false,
+      "answers": false,
+      "clipboard": true,
+      "recentChoices": [
+        "click_0",
+        "click_1",
+        "click_0",
+        "click_1"
+      ],
+      "recentActions": [
+        "1. click [0] click \"Grocery list\"",
+        "2. click [1] click \"Meeting notes\""
+      ],
+      "lastUnchanged": null,
+      "today": null,
+      "guidance": [],
+      "verificationNote": null,
+      "tableTruncated": false,
+      "tableGrid": null,
+      "elements": [
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.notes",
+          "text": "Grocery list",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 200,
+            "r": 1080,
+            "b": 320
+          },
+          "center": {
+            "x": 540,
+            "y": 260
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.notes",
+          "text": "Meeting notes",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 340,
+            "r": 1080,
+            "b": 460
+          },
+          "center": {
+            "x": 540,
+            "y": 400
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        }
+      ],
+      "screen": {
+        "app": "com.example.notes",
+        "size": "1080x2340",
+        "w": 1080,
+        "h": 2340
+      },
+      "goal": "delete the note"
+    }
+  },
+  {
+    "kind": "questions",
+    "name": "stuck-scroll",
+    "input": {
+      "texts": [],
+      "apps": [],
+      "copied": false,
+      "clipboardReady": false,
+      "canScroll": true,
+      "launcher": false,
+      "answers": false,
+      "clipboard": true,
+      "recentChoices": [
+        "scroll_down"
+      ],
+      "recentActions": [
+        "1. scroll [0] scroll (no visible change)"
+      ],
+      "lastUnchanged": "scroll_down",
+      "today": null,
+      "guidance": [],
+      "verificationNote": null,
+      "tableTruncated": false,
+      "tableGrid": null,
+      "elements": [
+        {
+          "class": "androidx.recyclerview.widget.RecyclerView",
+          "pkg": "com.example.list",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 100,
+            "r": 1080,
+            "b": 2200
+          },
+          "center": {
+            "x": 540,
+            "y": 1150
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "scrollable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.list",
+          "text": "Alpha",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 200,
+            "r": 1080,
+            "b": 320
+          },
+          "center": {
+            "x": 540,
+            "y": 260
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.list",
+          "text": "Beta",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 340,
+            "r": 1080,
+            "b": 460
+          },
+          "center": {
+            "x": 540,
+            "y": 400
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        }
+      ],
+      "screen": {
+        "app": "com.example.list",
+        "size": "1080x2340",
+        "w": 1080,
+        "h": 2340
+      },
+      "goal": "find the advanced settings"
+    }
+  },
+  {
+    "kind": "questions",
+    "name": "goal-table",
+    "input": {
+      "texts": [],
+      "apps": [],
+      "copied": false,
+      "clipboardReady": false,
+      "canScroll": false,
+      "launcher": false,
+      "answers": false,
+      "clipboard": true,
+      "recentChoices": [],
+      "recentActions": [],
+      "lastUnchanged": null,
+      "today": null,
+      "guidance": [],
+      "verificationNote": null,
+      "tableTruncated": false,
+      "tableGrid": null,
+      "elements": [],
+      "screen": null,
+      "goal": "Add the following expenses into the pro expense:\nname|amount_dollars|category_name|note\nStationery|352.34|Others|A need\nBakery Items|469.02|Food|A need"
+    }
+  },
+  {
+    "kind": "questions",
+    "name": "guidance-note",
+    "input": {
+      "texts": [],
+      "apps": [],
+      "copied": false,
+      "clipboardReady": false,
+      "canScroll": false,
+      "launcher": false,
+      "answers": false,
+      "clipboard": true,
+      "recentChoices": [
+        "click_0"
+      ],
+      "recentActions": [
+        "1. click [0] click \"Timer\""
+      ],
+      "lastUnchanged": null,
+      "today": "2026-11-13",
+      "guidance": [
+        "The Timer tab keeps the saved preset at the bottom.",
+        "   "
+      ],
+      "verificationNote": "A done was already rejected here: requirement 2 (\"Do not start it.\") failed verification.",
+      "tableTruncated": false,
+      "tableGrid": null,
+      "elements": [
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.clock",
+          "text": "Timer",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 200,
+            "r": 1080,
+            "b": 320
+          },
+          "center": {
+            "x": 540,
+            "y": 260
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        }
+      ],
+      "screen": {
+        "app": "com.example.clock",
+        "size": "1080x2340",
+        "w": 1080,
+        "h": 2340
+      },
+      "goal": "Set the timer. Do not start it."
+    }
+  },
+  {
+    "kind": "questions",
+    "name": "grid-table",
+    "input": {
+      "texts": [],
+      "apps": [],
+      "copied": false,
+      "clipboardReady": false,
+      "canScroll": true,
+      "launcher": false,
+      "answers": false,
+      "clipboard": true,
+      "recentChoices": [],
+      "recentActions": [],
+      "lastUnchanged": null,
+      "today": null,
+      "guidance": [],
+      "verificationNote": null,
+      "tableTruncated": false,
+      "tableGrid": {
+        "size": "150x150",
+        "count": 6
+      },
+      "elements": [
+        {
+          "class": "androidx.recyclerview.widget.RecyclerView",
+          "pkg": "com.example.calendar",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 100,
+            "r": 1080,
+            "b": 2200
+          },
+          "center": {
+            "x": 540,
+            "y": 1150
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "scrollable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.calendar",
+          "text": "October 2026",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 150,
+            "r": 1080,
+            "b": 250
+          },
+          "center": {
+            "x": 540,
+            "y": 200
+          },
+          "offScreen": false,
+          "parentIdx": -1
+        },
+        {
+          "class": "android.widget.Button",
+          "pkg": "com.example.calendar",
+          "text": "List view",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 800,
+            "t": 270,
+            "r": 1040,
+            "b": 350
+          },
+          "center": {
+            "x": 920,
+            "y": 310
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.FrameLayout",
+          "pkg": "com.example.calendar",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 100,
+            "t": 450,
+            "r": 250,
+            "b": 600
+          },
+          "center": {
+            "x": 175,
+            "y": 525
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.FrameLayout",
+          "pkg": "com.example.calendar",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 350,
+            "t": 450,
+            "r": 500,
+            "b": 600
+          },
+          "center": {
+            "x": 425,
+            "y": 525
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.FrameLayout",
+          "pkg": "com.example.calendar",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 600,
+            "t": 450,
+            "r": 750,
+            "b": 600
+          },
+          "center": {
+            "x": 675,
+            "y": 525
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.FrameLayout",
+          "pkg": "com.example.calendar",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 100,
+            "t": 650,
+            "r": 250,
+            "b": 800
+          },
+          "center": {
+            "x": 175,
+            "y": 725
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.FrameLayout",
+          "pkg": "com.example.calendar",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 350,
+            "t": 650,
+            "r": 500,
+            "b": 800
+          },
+          "center": {
+            "x": 425,
+            "y": 725
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.FrameLayout",
+          "pkg": "com.example.calendar",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 600,
+            "t": 650,
+            "r": 750,
+            "b": 800
+          },
+          "center": {
+            "x": 675,
+            "y": 725
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        }
+      ],
+      "screen": {
+        "app": "com.example.calendar",
+        "size": "1080x2340",
+        "w": 1080,
+        "h": 2340
+      },
+      "goal": "select the 15th day of the month"
+    }
+  },
+  {
+    "kind": "questions",
+    "name": "truncated-table",
+    "input": {
+      "texts": [],
+      "apps": [],
+      "copied": false,
+      "clipboardReady": false,
+      "canScroll": true,
+      "launcher": false,
+      "answers": false,
+      "clipboard": true,
+      "recentChoices": [],
+      "recentActions": [],
+      "lastUnchanged": null,
+      "today": null,
+      "guidance": [],
+      "verificationNote": null,
+      "tableTruncated": true,
+      "tableGrid": null,
+      "elements": [
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 1",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 100,
+            "r": 1080,
+            "b": 122
+          },
+          "center": {
+            "x": 540,
+            "y": 111
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 2",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 126,
+            "r": 1080,
+            "b": 148
+          },
+          "center": {
+            "x": 540,
+            "y": 137
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 3",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 152,
+            "r": 1080,
+            "b": 174
+          },
+          "center": {
+            "x": 540,
+            "y": 163
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 4",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 178,
+            "r": 1080,
+            "b": 200
+          },
+          "center": {
+            "x": 540,
+            "y": 189
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 5",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 204,
+            "r": 1080,
+            "b": 226
+          },
+          "center": {
+            "x": 540,
+            "y": 215
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 6",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 230,
+            "r": 1080,
+            "b": 252
+          },
+          "center": {
+            "x": 540,
+            "y": 241
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 7",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 256,
+            "r": 1080,
+            "b": 278
+          },
+          "center": {
+            "x": 540,
+            "y": 267
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 8",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 282,
+            "r": 1080,
+            "b": 304
+          },
+          "center": {
+            "x": 540,
+            "y": 293
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 9",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 308,
+            "r": 1080,
+            "b": 330
+          },
+          "center": {
+            "x": 540,
+            "y": 319
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 10",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 334,
+            "r": 1080,
+            "b": 356
+          },
+          "center": {
+            "x": 540,
+            "y": 345
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 11",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 360,
+            "r": 1080,
+            "b": 382
+          },
+          "center": {
+            "x": 540,
+            "y": 371
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 12",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 386,
+            "r": 1080,
+            "b": 408
+          },
+          "center": {
+            "x": 540,
+            "y": 397
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 13",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 412,
+            "r": 1080,
+            "b": 434
+          },
+          "center": {
+            "x": 540,
+            "y": 423
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 14",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 438,
+            "r": 1080,
+            "b": 460
+          },
+          "center": {
+            "x": 540,
+            "y": 449
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 15",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 464,
+            "r": 1080,
+            "b": 486
+          },
+          "center": {
+            "x": 540,
+            "y": 475
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 16",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 490,
+            "r": 1080,
+            "b": 512
+          },
+          "center": {
+            "x": 540,
+            "y": 501
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 17",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 516,
+            "r": 1080,
+            "b": 538
+          },
+          "center": {
+            "x": 540,
+            "y": 527
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 18",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 542,
+            "r": 1080,
+            "b": 564
+          },
+          "center": {
+            "x": 540,
+            "y": 553
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 19",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 568,
+            "r": 1080,
+            "b": 590
+          },
+          "center": {
+            "x": 540,
+            "y": 579
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 20",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 594,
+            "r": 1080,
+            "b": 616
+          },
+          "center": {
+            "x": 540,
+            "y": 605
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 21",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 620,
+            "r": 1080,
+            "b": 642
+          },
+          "center": {
+            "x": 540,
+            "y": 631
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 22",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 646,
+            "r": 1080,
+            "b": 668
+          },
+          "center": {
+            "x": 540,
+            "y": 657
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 23",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 672,
+            "r": 1080,
+            "b": 694
+          },
+          "center": {
+            "x": 540,
+            "y": 683
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 24",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 698,
+            "r": 1080,
+            "b": 720
+          },
+          "center": {
+            "x": 540,
+            "y": 709
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 25",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 724,
+            "r": 1080,
+            "b": 746
+          },
+          "center": {
+            "x": 540,
+            "y": 735
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 26",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 750,
+            "r": 1080,
+            "b": 772
+          },
+          "center": {
+            "x": 540,
+            "y": 761
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 27",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 776,
+            "r": 1080,
+            "b": 798
+          },
+          "center": {
+            "x": 540,
+            "y": 787
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 28",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 802,
+            "r": 1080,
+            "b": 824
+          },
+          "center": {
+            "x": 540,
+            "y": 813
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 29",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 828,
+            "r": 1080,
+            "b": 850
+          },
+          "center": {
+            "x": 540,
+            "y": 839
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 30",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 854,
+            "r": 1080,
+            "b": 876
+          },
+          "center": {
+            "x": 540,
+            "y": 865
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 31",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 880,
+            "r": 1080,
+            "b": 902
+          },
+          "center": {
+            "x": 540,
+            "y": 891
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 32",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 906,
+            "r": 1080,
+            "b": 928
+          },
+          "center": {
+            "x": 540,
+            "y": 917
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 33",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 932,
+            "r": 1080,
+            "b": 954
+          },
+          "center": {
+            "x": 540,
+            "y": 943
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 34",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 958,
+            "r": 1080,
+            "b": 980
+          },
+          "center": {
+            "x": 540,
+            "y": 969
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 35",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 984,
+            "r": 1080,
+            "b": 1006
+          },
+          "center": {
+            "x": 540,
+            "y": 995
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 36",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1010,
+            "r": 1080,
+            "b": 1032
+          },
+          "center": {
+            "x": 540,
+            "y": 1021
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 37",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1036,
+            "r": 1080,
+            "b": 1058
+          },
+          "center": {
+            "x": 540,
+            "y": 1047
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 38",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1062,
+            "r": 1080,
+            "b": 1084
+          },
+          "center": {
+            "x": 540,
+            "y": 1073
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 39",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1088,
+            "r": 1080,
+            "b": 1110
+          },
+          "center": {
+            "x": 540,
+            "y": 1099
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 40",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1114,
+            "r": 1080,
+            "b": 1136
+          },
+          "center": {
+            "x": 540,
+            "y": 1125
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 41",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1140,
+            "r": 1080,
+            "b": 1162
+          },
+          "center": {
+            "x": 540,
+            "y": 1151
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 42",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1166,
+            "r": 1080,
+            "b": 1188
+          },
+          "center": {
+            "x": 540,
+            "y": 1177
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 43",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1192,
+            "r": 1080,
+            "b": 1214
+          },
+          "center": {
+            "x": 540,
+            "y": 1203
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 44",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1218,
+            "r": 1080,
+            "b": 1240
+          },
+          "center": {
+            "x": 540,
+            "y": 1229
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 45",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1244,
+            "r": 1080,
+            "b": 1266
+          },
+          "center": {
+            "x": 540,
+            "y": 1255
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 46",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1270,
+            "r": 1080,
+            "b": 1292
+          },
+          "center": {
+            "x": 540,
+            "y": 1281
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 47",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1296,
+            "r": 1080,
+            "b": 1318
+          },
+          "center": {
+            "x": 540,
+            "y": 1307
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 48",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1322,
+            "r": 1080,
+            "b": 1344
+          },
+          "center": {
+            "x": 540,
+            "y": 1333
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 49",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1348,
+            "r": 1080,
+            "b": 1370
+          },
+          "center": {
+            "x": 540,
+            "y": 1359
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 50",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1374,
+            "r": 1080,
+            "b": 1396
+          },
+          "center": {
+            "x": 540,
+            "y": 1385
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 51",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1400,
+            "r": 1080,
+            "b": 1422
+          },
+          "center": {
+            "x": 540,
+            "y": 1411
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 52",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1426,
+            "r": 1080,
+            "b": 1448
+          },
+          "center": {
+            "x": 540,
+            "y": 1437
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 53",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1452,
+            "r": 1080,
+            "b": 1474
+          },
+          "center": {
+            "x": 540,
+            "y": 1463
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 54",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1478,
+            "r": 1080,
+            "b": 1500
+          },
+          "center": {
+            "x": 540,
+            "y": 1489
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 55",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1504,
+            "r": 1080,
+            "b": 1526
+          },
+          "center": {
+            "x": 540,
+            "y": 1515
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 56",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1530,
+            "r": 1080,
+            "b": 1552
+          },
+          "center": {
+            "x": 540,
+            "y": 1541
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 57",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1556,
+            "r": 1080,
+            "b": 1578
+          },
+          "center": {
+            "x": 540,
+            "y": 1567
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 58",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1582,
+            "r": 1080,
+            "b": 1604
+          },
+          "center": {
+            "x": 540,
+            "y": 1593
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 59",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1608,
+            "r": 1080,
+            "b": 1630
+          },
+          "center": {
+            "x": 540,
+            "y": 1619
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 60",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1634,
+            "r": 1080,
+            "b": 1656
+          },
+          "center": {
+            "x": 540,
+            "y": 1645
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 61",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1660,
+            "r": 1080,
+            "b": 1682
+          },
+          "center": {
+            "x": 540,
+            "y": 1671
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 62",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1686,
+            "r": 1080,
+            "b": 1708
+          },
+          "center": {
+            "x": 540,
+            "y": 1697
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 63",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1712,
+            "r": 1080,
+            "b": 1734
+          },
+          "center": {
+            "x": 540,
+            "y": 1723
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 64",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1738,
+            "r": 1080,
+            "b": 1760
+          },
+          "center": {
+            "x": 540,
+            "y": 1749
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 65",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1764,
+            "r": 1080,
+            "b": 1786
+          },
+          "center": {
+            "x": 540,
+            "y": 1775
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 66",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1790,
+            "r": 1080,
+            "b": 1812
+          },
+          "center": {
+            "x": 540,
+            "y": 1801
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 67",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1816,
+            "r": 1080,
+            "b": 1838
+          },
+          "center": {
+            "x": 540,
+            "y": 1827
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 68",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1842,
+            "r": 1080,
+            "b": 1864
+          },
+          "center": {
+            "x": 540,
+            "y": 1853
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 69",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1868,
+            "r": 1080,
+            "b": 1890
+          },
+          "center": {
+            "x": 540,
+            "y": 1879
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 70",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1894,
+            "r": 1080,
+            "b": 1916
+          },
+          "center": {
+            "x": 540,
+            "y": 1905
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 71",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1920,
+            "r": 1080,
+            "b": 1942
+          },
+          "center": {
+            "x": 540,
+            "y": 1931
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 72",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1946,
+            "r": 1080,
+            "b": 1968
+          },
+          "center": {
+            "x": 540,
+            "y": 1957
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 73",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1972,
+            "r": 1080,
+            "b": 1994
+          },
+          "center": {
+            "x": 540,
+            "y": 1983
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 74",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 1998,
+            "r": 1080,
+            "b": 2020
+          },
+          "center": {
+            "x": 540,
+            "y": 2009
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 75",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 2024,
+            "r": 1080,
+            "b": 2046
+          },
+          "center": {
+            "x": 540,
+            "y": 2035
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 76",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 2050,
+            "r": 1080,
+            "b": 2072
+          },
+          "center": {
+            "x": 540,
+            "y": 2061
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 77",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 2076,
+            "r": 1080,
+            "b": 2098
+          },
+          "center": {
+            "x": 540,
+            "y": 2087
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 78",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 2102,
+            "r": 1080,
+            "b": 2124
+          },
+          "center": {
+            "x": 540,
+            "y": 2113
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 79",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 2128,
+            "r": 1080,
+            "b": 2150
+          },
+          "center": {
+            "x": 540,
+            "y": 2139
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 80",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 2154,
+            "r": 1080,
+            "b": 2176
+          },
+          "center": {
+            "x": 540,
+            "y": 2165
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.trunc",
+          "text": "Setting 81",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 2180,
+            "r": 1080,
+            "b": 2202
+          },
+          "center": {
+            "x": 540,
+            "y": 2191
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        }
+      ],
+      "screen": {
+        "app": "com.example.trunc",
+        "size": "1080x2340",
+        "w": 1080,
+        "h": 2340
+      },
+      "goal": "open item 81"
+    }
+  },
+  {
+    "kind": "questions",
+    "name": "clipboard-paste",
+    "input": {
+      "texts": [],
+      "apps": [],
+      "copied": true,
+      "clipboardReady": false,
+      "canScroll": false,
+      "launcher": false,
+      "answers": false,
+      "clipboard": true,
+      "recentChoices": [],
+      "recentActions": [],
+      "lastUnchanged": null,
+      "today": null,
+      "guidance": [],
+      "verificationNote": null,
+      "tableTruncated": false,
+      "tableGrid": null,
+      "elements": [
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.browser",
+          "text": "https://example.com/reset?token=abc123",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 200,
+            "r": 1080,
+            "b": 280
+          },
+          "center": {
+            "x": 540,
+            "y": 240
+          },
+          "offScreen": false,
+          "parentIdx": -1
+        },
+        {
+          "class": "android.widget.EditText",
+          "pkg": "com.example.browser",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "Address",
+          "bounds": {
+            "l": 0,
+            "t": 320,
+            "r": 1080,
+            "b": 400
+          },
+          "center": {
+            "x": 540,
+            "y": 360
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        }
+      ],
+      "screen": {
+        "app": "com.example.browser",
+        "size": "1080x2340",
+        "w": 1080,
+        "h": 2340
+      },
+      "goal": "copy the URL and paste it into the address field"
+    }
+  },
+  {
+    "kind": "questions",
+    "name": "clipboard-ready",
+    "input": {
+      "texts": [],
+      "apps": [],
+      "copied": false,
+      "clipboardReady": true,
+      "canScroll": false,
+      "launcher": false,
+      "answers": false,
+      "clipboard": true,
+      "recentChoices": [],
+      "recentActions": [],
+      "lastUnchanged": null,
+      "today": null,
+      "guidance": [],
+      "verificationNote": null,
+      "tableTruncated": false,
+      "tableGrid": null,
+      "elements": [
+        {
+          "class": "android.widget.EditText",
+          "pkg": "com.example.browser",
+          "text": "https://example.com/reset?token=abc123",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "Address",
+          "bounds": {
+            "l": 0,
+            "t": 320,
+            "r": 1080,
+            "b": 400
+          },
+          "center": {
+            "x": 540,
+            "y": 360
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.example.browser",
+          "text": "Go",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 900,
+            "t": 420,
+            "r": 1040,
+            "b": 500
+          },
+          "center": {
+            "x": 970,
+            "y": 460
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        }
+      ],
+      "screen": {
+        "app": "com.example.browser",
+        "size": "1080x2340",
+        "w": 1080,
+        "h": 2340
+      },
+      "goal": "paste the copied address into the address field"
+    }
+  },
+  {
+    "kind": "decide",
+    "name": "settings",
+    "request": {
+      "goal": "turn Wi-Fi off",
+      "screen": {
+        "app": "com.android.settings",
+        "size": "1080x2400",
+        "w": 1080,
+        "h": 2400
+      },
+      "elements": [
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.android.settings",
+          "text": "Wi-Fi",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 100,
+            "r": 500,
+            "b": 200
+          },
+          "center": {
+            "x": 250,
+            "y": 150
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.Switch",
+          "pkg": "com.android.settings",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 800,
+            "t": 120,
+            "r": 1000,
+            "b": 180
+          },
+          "center": {
+            "x": 900,
+            "y": 150
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "checkable": true,
+          "checked": true,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.EditText",
+          "pkg": "com.android.settings",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "Search",
+          "bounds": {
+            "l": 0,
+            "t": 300,
+            "r": 1000,
+            "b": 400
+          },
+          "center": {
+            "x": 500,
+            "y": 350
+          },
+          "offScreen": false,
+          "parentIdx": -1
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.android.settings",
+          "text": "15",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 500,
+            "r": 200,
+            "b": 600
+          },
+          "center": {
+            "x": 100,
+            "y": 550
+          },
+          "offScreen": false,
+          "parentIdx": -1
+        }
+      ],
+      "recent_actions": [
+        "1. click [0] click \"Wi-Fi\""
+      ],
+      "provided_texts": [
+        "hello",
+        "world"
+      ],
+      "apps": null,
+      "can_scroll": false,
+      "copied": false,
+      "clipboard": false,
+      "clipboard_ready": false,
+      "answers": true,
+      "recent_choices": [],
+      "last_unchanged": null,
+      "today": null,
+      "guidance": null
+    }
+  },
+  {
+    "kind": "decide",
+    "name": "launcher",
+    "request": {
+      "goal": "open Chrome",
+      "screen": {
+        "app": "com.google.android.apps.nexuslauncher",
+        "size": "1080x2400",
+        "w": 1080,
+        "h": 2400
+      },
+      "elements": [
+        {
+          "class": "androidx.recyclerview.widget.RecyclerView",
+          "pkg": "com.google.android.apps.nexuslauncher",
+          "text": "",
+          "resourceId": "com.google.android.apps.nexuslauncher:id/workspace",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 0,
+            "t": 100,
+            "r": 1080,
+            "b": 2200
+          },
+          "center": {
+            "x": 540,
+            "y": 1150
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "scrollable": true
+        },
+        {
+          "class": "android.widget.FrameLayout",
+          "pkg": "com.google.android.apps.nexuslauncher",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 50,
+            "t": 300,
+            "r": 250,
+            "b": 500
+          },
+          "center": {
+            "x": 150,
+            "y": 400
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.google.android.apps.nexuslauncher",
+          "text": "Chrome",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 60,
+            "t": 440,
+            "r": 240,
+            "b": 480
+          },
+          "center": {
+            "x": 150,
+            "y": 460
+          },
+          "offScreen": false,
+          "parentIdx": 1
+        },
+        {
+          "class": "android.widget.FrameLayout",
+          "pkg": "com.google.android.apps.nexuslauncher",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 300,
+            "t": 300,
+            "r": 500,
+            "b": 500
+          },
+          "center": {
+            "x": 400,
+            "y": 400
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.google.android.apps.nexuslauncher",
+          "text": "📷 Camera",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 310,
+            "t": 440,
+            "r": 490,
+            "b": 480
+          },
+          "center": {
+            "x": 400,
+            "y": 460
+          },
+          "offScreen": false,
+          "parentIdx": 3
+        },
+        {
+          "class": "android.widget.FrameLayout",
+          "pkg": "com.google.android.apps.nexuslauncher",
+          "text": "",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 550,
+            "t": 300,
+            "r": 750,
+            "b": 500
+          },
+          "center": {
+            "x": 650,
+            "y": 400
+          },
+          "offScreen": false,
+          "parentIdx": -1,
+          "clickable": true
+        },
+        {
+          "class": "android.widget.TextView",
+          "pkg": "com.google.android.apps.nexuslauncher",
+          "text": "Настройки",
+          "resourceId": "",
+          "contentDesc": "",
+          "hint": "",
+          "bounds": {
+            "l": 560,
+            "t": 440,
+            "r": 740,
+            "b": 480
+          },
+          "center": {
+            "x": 650,
+            "y": 460
+          },
+          "offScreen": false,
+          "parentIdx": 5
+        }
+      ],
+      "recent_actions": [
+        "1. scroll [0] scroll",
+        "2. scroll [0] scroll (no visible change)"
+      ],
+      "provided_texts": null,
+      "apps": [
+        "Chrome",
+        "Settings"
+      ],
+      "can_scroll": true,
+      "copied": true,
+      "clipboard": true,
+      "clipboard_ready": false,
+      "answers": false,
+      "recent_choices": [
+        "scroll_down",
+        "scroll_down"
+      ],
+      "last_unchanged": "scroll_down",
+      "today": "2026-11-13",
+      "guidance": [
+        "Chrome lives on the second home page."
+      ]
+    }
+  },
+  {
+    "kind": "check",
+    "name": "no-route",
+    "goal": "Navigate from Reykjavik to Akureyri",
+    "values": [
+      "Reykjavik",
+      "Akureyri"
+    ],
+    "ref": "7f9c2ba4-1a2b-4c3d-8e9f-0a1b2c3d4e5f",
+    "hybrid": false,
+    "guidance": []
+  },
+  {
+    "kind": "check",
+    "name": "no-values",
+    "goal": "Check the archive",
+    "values": [],
+    "ref": "2f1d7a3c-8b4e-4d6f-9a1b-3c5d7e9f0a2b",
+    "hybrid": false,
+    "guidance": []
+  },
+  {
+    "kind": "vision",
+    "name": "blind",
+    "goal": "find the release notes",
+    "values": [
+      "droidjev"
+    ],
+    "ref": "3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+    "hybrid": false,
+    "guidance": []
+  },
+  {
+    "kind": "vision",
+    "name": "hybrid",
+    "goal": "open the account page",
+    "values": [],
+    "ref": "9b2f1c7e-5d4a-4f6e-8a1b-2c3d4e5f6a7b",
+    "hybrid": true,
+    "guidance": [
+      "The account menu is behind the avatar in the top right."
+    ]
+  }
+]

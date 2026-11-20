@@ -1,93 +1,95 @@
 # AGENTS.md — droidjev
 
-Zero-dependency Node.js ≥ 20 CLI (ESM, `"type": "module"`) that automates
+Zero-dependency Go CLI (stdlib only, single `package main`) that automates
 Android emulators text-first: dumps the view hierarchy via a resident
 appium-uiautomator2-server, asks the TypeSafe jev model which indexed element
 advances the goal, taps it via `adb`, verifies the screen changed. Screenshots
-are sent to the model only as a blind-screen fallback (see `src/shot.js`). Do
-not add npm dependencies or a `package-lock.json`; stdlib only. Published to
-npm as `droidjev` (`npm i -g droidjev` / `npx droidjev`) — releases go through
-CI, see Releasing.
+are sent to the model only as a blind-screen fallback (see `shot.go`). Released
+as a static darwin/arm64 binary through GitHub Releases — see Releasing.
 
 ## Commands
 
 ```bash
-npm test                     # unit tests — no network, no device (default suite)
-DROIDJEV_E2E=1 npm test      # live e2e — spends real TypeSafe tokens, needs a
-                             # booted emulator (+ Chrome for the paste scenario)
-npm run test:coverage        # unit tests + built-in coverage report
-npm run lint                 # pinned eslint via npx — nothing installed, no deps added
-npm run format               # pinned prettier via npx — same zero-install trick
-npm run format:check         # prettier --check — what CI enforces
-for f in src/*.js; do node --check "$f"; done   # syntax check (node --check
-                             # validates ONE file — a bare src/*.js glob checks
-                             # only the first and exits 0)
-./src/cli.js <cmd>           # run the CLI in place (shebang'd entry; package.json
-                             # bin points here — the command name stays `droidjev`)
-npm pack --dry-run           # inspect the npm tarball before publishing
+go test ./...                 # unit tests — no network, no device (default suite)
+DROIDJEV_E2E=1 go test -run TestE2E -v ./...   # live e2e — spends real TypeSafe
+                              # tokens, needs a booted emulator (+ Chrome for the
+                              # paste scenario)
+go vet ./...
+gofmt -l .                    # empty output = formatted; CI fails otherwise
+go build -o /tmp/droidjev .   # build the binary
+go run . <cmd>                # run the CLI in place
 ```
 
 ## Releasing
 
-- CI (`.github/workflows/ci.yml`) gates every push/PR: tests on node 20 and
-  24 (`engines` floor + `.nvmrc`), eslint, prettier --check, per-file
-  `node --check`.
-- Publish by creating a GitHub Release tagged `vX.Y.Z`: `release.yml` runs the
-  tests and `npm stage publish --provenance` (needs the `NPM_TOKEN` repo
-  secret; staging works with any token type, no 2FA bypass required). The
-  version goes live only after a maintainer runs `npm stage approve
-  <stage-id>` locally (interactive 2FA). Don't stage from outside CI —
-  provenance attestation only works there — and don't bump `version`
-  without releasing; the release tag must match it.
-- Tarball contents are the `files` field (`droidjev`, `src`, `skill`) plus
-  README/LICENSE/package.json; `prepublishOnly` re-runs the tests as a local
-  backstop.
+- CI (`.github/workflows/ci.yml`) gates every push/PR: gofmt, `go vet`,
+  `go test`, and a darwin/arm64 cross-compile of the release target.
+- Publish by creating a GitHub Release tagged `vX.Y.Z`: `release.yml`
+  cross-compiles `GOOS=darwin GOARCH=arm64` (CGO off, `-trimpath`, `-s -w`,
+  `-X main.version=${VERSION}` with the tag's leading `v` stripped), packs
+  `droidjev-VERSION-darwin-arm64.tar.gz`, writes a `.sha256` next to it, and
+  uploads both as release assets.
+- The version lives in the release tag; `main.version` is `"dev"` in a local
+  build. Nothing else in the tree carries a version to bump — the release tag
+  is the version.
+- There is no staging step: the uploaded assets are the release.
 
 ## Layout
 
-- `src/cli.js` — CLI entry (shebang'd, `package.json` `bin` → this file): arg
-  parsing, dispatch, `bootstrap()` with the main-module guard.
-- `src/agent.js` — the `act` goal loop: builds the single per-step question
-  (operation + goal_met in parallel), executes argmax as-is, double-checks `done`.
-  An empty element table diverts to the vision step: one request with a
+- `main.go` — CLI entry: arg parsing, dispatch, `usage`, `main()`.
+- `agent.go` — the `act` goal loop: builds the single per-step question
+  (operation + goal_met in parallel), executes argmax as-is, double-checks
+  `done`. An empty element table diverts to the vision step: one request with a
   screenshot asset carrying a validated choice + noul gate + box tap target.
-- `src/check.js` — independent impossibility verdict: one screenshot, one jev
+- `check.go` — independent impossibility verdict: one screenshot, one jev
   image request (`noul` explicit-statement gate + `kind` choice + evidence
   `box`), strictly validated. Never acts; refuses a non-default model;
   `empty_state` is never impossible.
-- `src/act.js` — executor: validated decision → adb input. Owns
-  `sanitizeInputText` (the shell-inert `--text` charset). WAKE_UP rides in the
+- `act.go` — executor: validated decision → adb input. Owns
+  `SanitizeInputText` (the shell-inert `--text` charset). WAKE_UP rides in the
   same adb invocation as each gesture (doze-proof input).
-- `src/uia2.js` — resident uia2-server lifecycle (download/install/start, HTTP
+- `uia2.go` — resident uia2-server lifecycle (download/install/start, HTTP
   over an adb-forwarded port; APKs cached in `~/.cache/droidjev`).
-- `src/layout.js` / `src/elements.js` — parse uia2 XML → numbered element table,
+- `layout.go` / `elements.go` — parse uia2 XML → numbered element table,
   hierarchy hash, scroll anchor. One dump per step; the settle polls dumps until
   two consecutive hashes match.
-- `src/adb.js` — thin adb wrapper; `src/boot.js` — device pick, AVD boot,
-  wake/unlock, `withAnimationsOff`; `src/find.js` — deterministic label search;
-  `src/start.js` — launch by package; `src/snapshot.js` — table print.
-- `src/typesafe.js` — API key handling + strict response validation (choice,
-  noul, box). Model is pinned to `jev-1.14.0` (box/images are 1.14-only).
-- `src/shot.js` — vision-fallback capture: raw `adb exec-out screencap`
-  (RGBA, 12/16-byte header detected by payload length) → box-average
-  downscale into TypeSafe's image limits → minimal stdlib PNG encode.
-- `src/util.js` — `run()` spawner (argument arrays; `binary: true` keeps
-  stdout a Buffer), `DroidJevError`, `redact()`. Shared floor for
-  the security rules below; import from here, don't reimplement.
-- `test/unit.test.mjs` (offline), `test/e2e.test.mjs` (opt-in, see Commands).
+- `adb.go` — thin adb wrapper; `boot.go` — device pick, AVD boot, wake/unlock,
+  `WithAnimationsOff`; `find.go` — deterministic label search; `start.go` —
+  launch by package; `snapshot.go` — table print.
+- `decide.go` — the device-free `decide` protocol (one JSON request in, one
+  validated answer out; `--serve` keeps the process).
+- `skills.go` — goal macros (keypad sequence, route texts, table rows); `skills_test.go`
+  pins the parsers.
+- `typesafe.go` — API key handling + strict response validation (choice, noul,
+  box). Model is pinned to `jev-1.14.0` (box/images are 1.14-only).
+- `shot.go` — vision-fallback capture: raw `adb exec-out screencap` (RGBA,
+  12/16-byte header detected by payload length) → box-average downscale into
+  TypeSafe's image limits → stdlib `image/png` encode.
+- `jstext.go` / `ordered.go` — JS string semantics the prompts depend on
+  (UTF-16 length, slice, trim, `JSON.stringify` quoting) and insertion-ordered
+  maps/sets.
+- `trace.go` — opt-in JSONL episode tracing under `~/.cache/droidjev/runs/`.
+- `util.go` — `Run()` spawner (argument arrays), `DroidJevError`, `Redact()`.
+  Shared floor for the security rules below; import from here, don't
+  reimplement.
+- `*_test.go` — offline unit tests; `e2e_test.go` is opt-in (see Commands).
+  `testdata/golden/` + `testdata/golden-fixtures.json` are the byte-equality
+  prompt goldens.
 - `skill/SKILL.md` — source of the installable agent skill; keep in sync with
   CLI behavior when commands/flags change.
 - `.github/workflows/` — `ci.yml` and `release.yml` (see Releasing).
-  `.nvmrc` pins node 24; `.prettierrc` — singleQuote, printWidth 120.
+- All `.go` files live at the repo root in one `package main` on purpose: the
+  CLI is one binary, and tests reach unexported helpers without an `internal/`
+  split.
 
-## Hard invariants (security model — tested in unit.test.mjs)
+## Hard invariants (security model — tested in `*_test.go`)
 
-- Every subprocess is spawned as an **argument array** via `util.run()` — never
+- Every subprocess is spawned as an **argument array** via `util.Run()` — never
   `sh -c`, never an interpolated command string.
 - The API key is read only from `TYPESAFE_API_KEY` at runtime and must never
   appear in files, logs, traces, `--json`, argv, or error messages; everything
-  printed passes through `redact()`.
-- Model answers are strictly validated in `typesafe.js` (choice ∈ offered
+  printed passes through `Redact()`.
+- Model answers are strictly validated in `typesafe.go` (choice ∈ offered
   options, probability sums, argmax consistency); an invalid answer executes
   **no action**. The model never produces coordinates/selectors/commands — only
   an index into our element table, resolved to a tap position in code. The one
@@ -98,7 +100,7 @@ npm pack --dry-run           # inspect the npm tarball before publishing
   `TypeSafe-Danger-Zone-Images` header — sent only on vision requests.
 - Text the model may type is operator input: `--text` values plus values the
   goal itself names (quoted, `from X to Y`, `named/phone/email`). All pass
-  `sanitizeInputText`; an explicit value outside `[A-Za-z0-9 .,:+=/@%^_-]` is
+  `SanitizeInputText`; an explicit value outside `[A-Za-z0-9 .,:+=/@%^_-]` is
   rejected naming the offending characters, an untypeable goal value is dropped.
 - `check` sends exactly one screenshot through the same danger-zone image path
   (`TypeSafe-Danger-Zone-Images`), refuses a non-default model before capture,
@@ -109,7 +111,22 @@ npm pack --dry-run           # inspect the npm tarball before publishing
 ## Gotchas
 
 - Exit codes: `0` done/found · `2` blocked (blockedReason in output) · `3`
-  error (`DroidJevError` carries `exitCode`).
+  error (`DroidJevError` carries `ExitCode`).
+- **Criteria order is prompt order.** `BuildQuestions` assembles its criteria
+  into `*OrdMap`/`*OrdSet` (`ordered.go`) in the exact original insertion order;
+  a bare Go map marshals alphabetically and silently changes the prompt. Never
+  use a plain map where criteria are built.
+- **Four RE2 emulations** stand in for JS lookaround, each hand-written:
+  `Redact`'s bearer pattern (`[\s\S]*?(?="|$)` lookahead), `GoalRequirements`'
+  sentence split (`(?<=[.!?])\s+` lookbehind), `GoalTexts`' route-endpoint
+  terminator (`(?=[.!?]|,\s+(?:and|then)\b|$)`), and `KeypadSequence`'s
+  leading-zero strip (`^0+(?=\d)`). Change them only with the goldens.
+- **Golden fixtures are byte-equality gates.** The Go tests rebuild every
+  question and compare bytes against `testdata/golden/`. There is no generator
+  in the tree — regenerate only by checking out the commit before the rewrite
+  and running `test/golden-generate.mjs` there.
+- `UTF16Truncate` drops a straddled surrogate pair whole (the emoji is removed,
+  not halved) — a deliberate choice recorded in docs/known-limits.md.
 - The hot loop must never shell out to the `android` CLI (~670 ms startup tax);
   raw adb only. The `android` CLI is used solely to boot an AVD.
 - UiAutomation is exclusive device-wide: the resident uia2 server displaces the
@@ -117,17 +134,15 @@ npm pack --dry-run           # inspect the npm tarball before publishing
   (`adb shell am force-stop io.appium.uiautomator2.server` hands it back).
 - Clipboard writes can't change the hierarchy — copy steps skip the settle and
   re-dump entirely (`copy_<idx>`/`paste` ops).
-- `find` scrolls top-down only; it stops as soon as scrolling provably cannot
-  help, and retries once after waking before declaring end-of-list.
+- `find` scrolls to the top of the list first (an up-scroll that changes
+  nothing twice), then scans down; it stops as soon as scrolling provably
+  cannot help, and retries once after waking before declaring end-of-list.
 - Vision fallback is jev-1.14-only (`box`) and blind-screens-only; a failed
   screenshot pipeline degrades to `blocked:blind_screen`, never to an error.
+  A box tap that lands on a readable interactive row snaps to that row's exact
+  center (`SnapBoxToRow`; container-sized rows never snap).
   Two blind screens hash identically (both tables are empty), so vision steps
   cannot rely on the hash for change detection.
-- `src/cli.js` is the npm `bin` target: keep the `#!/usr/bin/env node` shebang
-  and the main-module guard with `realpathSync(process.argv[1])` — Node
-  realpaths module URLs but not argv[1], so the bare comparison silently
-  never fires through npm's bin symlink. The guard makes the file runnable as
-  the `droidjev` command while keeping imports (tests) inert.
 - README.md documents user-facing behavior and links the deep dives in `docs/`
   (how-it-works, speed, security, known-limits, development) — update them
   alongside behavior changes.

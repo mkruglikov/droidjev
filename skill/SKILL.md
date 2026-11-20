@@ -12,11 +12,11 @@ advances the goal, taps it via adb, and verifies the screen changed — all in
 one CLI invocation. A typical 2-step goal finishes in ~6s. A powered-off
 emulator is fine: it auto-boots the first AVD (adds ~30–60s).
 
-**How to invoke:** run the `droidjev` binary from the repo if it is on PATH
-(`droidjev …`), otherwise `node <repo>/droidjev …` with the DroidJev
-repository path. Requires Node.js ≥ 20, `adb`, the `android` CLI on PATH, and
-`TYPESAFE_API_KEY` in the environment. Missing prerequisites produce a clear
-warning and stop — fix what they name, do not work around them.
+**How to invoke:** run the `droidjev` binary if it is on PATH (`droidjev …`);
+from a checkout without installing, run `go run . …` with the DroidJev
+repository as the working directory. Requires `adb`, the `android` CLI on
+PATH, and `TYPESAFE_API_KEY` in the environment. Missing prerequisites produce
+a clear warning and stop — fix what they name, do not work around them.
 
 ## Preferred usage: ONE act call with the full flow
 
@@ -45,8 +45,8 @@ model and are useful for setup or a single targeted lookup:
 
 ```bash
 droidjev start com.android.settings   # launch an app by package (am start/monkey)
-droidjev find "About phone" --tap     # search scrollable lists top-down for a
-                                      # label, tap the exact match (~0.6s/iteration)
+droidjev find "About phone" --tap     # scroll to the top of a list, then search
+                                      # it downward; tap the exact match (~0.6s/iteration)
 droidjev snapshot --grep "battery"    # filtered view of the current screen
 ```
 
@@ -142,8 +142,9 @@ owns its observation/action pipeline.
 
 ## Good to know
 
-- Sleeping display is handled automatically (wake before every gesture); an
-  emulator with a PIN lock stays blocked.
+- Sleeping display is handled automatically (wake before every gesture); a
+  device with a PIN/pattern lock is reported blocked (exit 2, "secure lock
+  screen") before the first step.
 - A host that already has its own observation and action pipeline (a test
   harness, a web driver) can embed just the decision: `droidjev decide` reads a
   JSON request on stdin (`goal`, `elements`, `screen`, `provided_texts`,

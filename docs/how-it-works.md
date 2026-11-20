@@ -31,7 +31,11 @@ be written in the UI's language.
   Box edges are validated 0–1 fractions forming an in-bounds rectangle, which
   code resolves to the tap point; below the confidence floor (0.6, the docs'
   example value) the tap is withheld and the step is recorded as a no-op so
-  the next decision can pick another route. `--no-vision` keeps the old
+  the next decision can pick another route. On a partly readable screen
+  (`--hybrid-vision`), a tap point that lands on one of the few readable
+  interactive rows snaps to that row's exact dump-read center — a hierarchy
+  rectangle beats a guessed box, so only genuinely unreadable targets ride
+  the raw box. `--no-vision` keeps the old
   behavior (an empty table blocks with `blind_screen`). Screenshots leave the
   machine only on this path — and they carry whatever the screen shows, the
   same privacy surface as the element table's text plus pixels.
@@ -43,13 +47,19 @@ be written in the UI's language.
   parallel. The
   model cannot point at the right element while declining to click it: the
   target and the action are the same judgment, and its argmax is executed
-  as-is. A key-less HEAD pre-warms the HTTPS connection during the initial
-  dump, so the first request skips the per-process TLS handshake (~0.5s).
+  as-is. A key-less HEAD is fired in the background before the initial dump,
+  so its handshake overlaps the dump and the first request skips the
+  per-process TLS handshake (~0.5s).
 - **One dump per step.** The post-action settle polls the dump (~20–50 ms
   each) until two consecutive hierarchy hashes match — nothing is animating —
   then that settled dump doubles as the previous action's verification (hash
   comparison). Scroll flings get a short cap (a mid-flight dump is readable);
-  screen transitions wait for motion to complete.
+  screen transitions wait for motion to complete. The one exception that buys
+  back the short cap: a pure translation (an opening app drawer) keeps
+  identical content while bounds move, so when the scroll cap expires with
+  only bounds still changing, the settle extends once (~450 ms) until the
+  translation stops — a mid-translation dump would carry off-by-one-icon
+  bounds.
 - **Options are what the host can execute.** The question set is assembled from
   the capabilities the caller declares: a host with no clipboard passes
   `clipboard: false` and never sees `copy_`/`paste`, one whose goal is a
@@ -59,6 +69,12 @@ be written in the UI's language.
   picks, and droidjev resolves the text. An editable row is offered as
   `type_<idx>_<k>` rather than `click_<idx>`: clicking a field only focuses it,
   which is the trap a date picker sets.
+- **The `decide` wire is typed.** A host with its own observation/action
+  pipeline sends one JSON request per decision (`goal`, `screen`, `elements`,
+  `provided_texts`, …). Root elements carry `parentIdx: -1`; the wire accepts
+  `null` or an absent key as "no parent", while an explicit index — including
+  `0` — names that element. `clipboard: null` is treated as absent (default
+  `true`), and a non-boolean truthy value is rejected rather than coerced.
 - **The table is filtered, not dumped.** Status-bar chrome from the platform's
   own package is dropped (a clock reading "15:34" looks exactly like a time
   field), and a grid of same-sized unlabeled cells — a calendar's month, a

@@ -51,4 +51,4 @@
   still steer the model toward a legal-but-wrong tap or a false `done`; the
   done-checker verifies every requirement before a done ends the episode.
 - Audited by an independent adversarial review; the injection/validation walls
-  held and all findings were fixed (tests in `test/unit.test.mjs`).
+  held and all findings were fixed (tests in the Go suite).

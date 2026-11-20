@@ -1,21 +1,28 @@
 name: release
+
 on:
   release:
     types: [published]
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      id-token: write # npm provenance: proves the tarball came from this repo
+      contents: write # gh release upload needs to write release assets
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-go@v5
         with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-      - run: npm test
-      - run: npm stage publish --provenance
+          go-version-file: go.mod
+      - name: build darwin/arm64 binary and checksum
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o droidjev .
+          tar czf "droidjev-${VERSION}-darwin-arm64.tar.gz" droidjev
+          shasum -a 256 "droidjev-${VERSION}-darwin-arm64.tar.gz" > "droidjev-${VERSION}-darwin-arm64.tar.gz.sha256"
+      - name: upload release assets
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release upload "$GITHUB_REF_NAME" "droidjev-${VERSION}-darwin-arm64.tar.gz" "droidjev-${VERSION}-darwin-arm64.tar.gz.sha256" --clobber
