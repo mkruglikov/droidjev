@@ -38,8 +38,9 @@ jobs:
           java-version: '17'
       - name: install android build tools
         run: |
-          yes | sdkmanager --licenses > /dev/null
-          sdkmanager "build-tools;36.0.0" "platforms;android-35" > /dev/null
+          SDKMANAGER="$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | tail -1)"
+          yes | "$SDKMANAGER" --licenses > /dev/null
+          "$SDKMANAGER" "build-tools;36.0.0" "platforms;android-35" > /dev/null
       - name: build the instrumentation APK
         run: instrument/build.sh
         env:

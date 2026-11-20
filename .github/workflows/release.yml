@@ -32,8 +32,9 @@ jobs:
           DROIDJEV_BUILD_TOOLS: '36.0.0'
           DROIDJEV_PLATFORM: 'android-35'
         run: |
-          yes | sdkmanager --licenses > /dev/null
-          sdkmanager "build-tools;36.0.0" "platforms;android-35" > /dev/null
+          SDKMANAGER="$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | tail -1)"
+          yes | "$SDKMANAGER" --licenses > /dev/null
+          "$SDKMANAGER" "build-tools;36.0.0" "platforms;android-35" > /dev/null
           instrument/build.sh
           mv instrument/droidjev-instrument.apk .
           shasum -a 256 droidjev-instrument.apk > droidjev-instrument.apk.sha256
