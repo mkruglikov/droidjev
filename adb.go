@@ -1,6 +1,6 @@
 // Thin adb wrapper. Everything here is argument-array spawns through Run, never
-// a shell. The hot loop must never shell out to the `android` CLI (~670ms
-// startup tax); adb is ~14ms per call.
+// a shell. The hot loop is adb-only (~14 ms per call); the SDK `emulator`
+// binary is the sole non-adb subprocess, and only on the cold AVD-boot path.
 //
 // The call timeouts and the regexes
 // (including JS `\s`, spelled with JSWhitespaceClass) are kept exact.

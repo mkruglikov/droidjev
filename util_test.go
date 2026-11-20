@@ -148,7 +148,7 @@ func TestRunMissing(t *testing.T) {
 }
 
 func TestInstallHint(t *testing.T) {
-	for _, f := range []string{"adb", "android", "zsh", "bash"} {
+	for _, f := range []string{"adb", "emulator", "zsh", "bash"} {
 		if installHint(f) == "" {
 			t.Errorf("installHint(%q) is empty", f)
 		}

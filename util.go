@@ -2,8 +2,6 @@
 // - subprocesses are spawned as argument arrays (never through a shell)
 // - every subprocess has a timeout and bounded output collection
 // - anything headed for logs/errors passes through Redact
-//
-// Messages are kept word for word.
 
 package main
 
@@ -72,10 +70,10 @@ func Redact(s string) string {
 // installHints are the human-readable install hints for missing external
 // tools.
 var installHints = map[string]string{
-	"adb":     "\"adb\" is not installed or not in PATH — install Android platform-tools:\n  https://developer.android.com/tools/releases/platform-tools",
-	"android": "the \"android\" CLI is not installed or not in PATH — install it:\n  https://developer.android.com/cli/install\n(only auto-booting an AVD needs it; pass --device to target a running emulator)",
-	"zsh":     "\"zsh\" not found",
-	"bash":    "\"bash\" not found",
+	"adb":      "\"adb\" is not installed or not in PATH — install Android platform-tools:\n  https://developer.android.com/tools/releases/platform-tools",
+	"emulator": "the Android SDK `emulator` binary is not installed or not in PATH — install it with\n  Android Studio's SDK Manager (\"Android Emulator\") or `sdkmanager --install \"emulator\"`\n(only auto-booting an AVD needs it; pass --device to target a running emulator)",
+	"zsh":      "\"zsh\" not found",
+	"bash":     "\"bash\" not found",
 }
 
 func installHint(file string) string { return installHints[file] }

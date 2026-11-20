@@ -1,25 +1,24 @@
 // Ensure a booted emulator exists: resolve --device (serial or AVD name),
-// auto-boot the first AVD when nothing is online. The `android` CLI is fine
-// here (cold path); the per-step hot loop stays adb-only.
-//
-// Every notice string, wait, timeout, and
-// error message is kept word for word.
+// auto-boot the first AVD when nothing is online. AVD boots spawn the SDK
+// `emulator` binary directly (the `android` CLI wrapper is gone — the binary
+// has stable flags, ships wherever AVDs come from, and passes -gpu through);
+// this is the cold path, the per-step hot loop stays adb-only.
 
 package main
 
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 )
 
 const (
-	androidCLI      = "android"
-	bootTimeoutMs   = 240_000
 	waitBootMs      = 90_000
 	bootSerialMs    = 60_000
 	pendingWaitMs   = 120_000
@@ -29,8 +28,9 @@ const (
 var (
 	// An AVD with `hw.gpu.enabled = no` renders on the CPU: a visible emulator
 	// then burns a whole core redrawing every frame and starves everything else
-	// on the host. The `android` CLI takes no -gpu passthrough, so the AVD's own
-	// config.ini is the only lever.
+	// on the host. The boot path passes `-gpu host` on the emulator's argv AND
+	// pins config.ini below — the pin keeps non-droidjev boots (Android Studio)
+	// fast too.
 	// JS `.` excludes \n, \r, U+2028 and U+2029; spell that out so a CRLF
 	// config keeps its \r.
 	gpuEnabledRe = regexp.MustCompile(`(?m)^hw\.gpu\.enabled[` + JSWhitespaceClass + `]*=[^\n\r\x{2028}\x{2029}]*`)
@@ -83,10 +83,71 @@ func replaceFirstRe(re *regexp.Regexp, s, repl string) string {
 // jsTrimEnd is `s.trimEnd()`.
 func jsTrimEnd(s string) string { return strings.TrimRight(s, jsSpaceCutset) }
 
-// ListAvds lists the AVDs the `android` CLI knows, skipping blank lines and
-// usage text.
+// emulatorBinName is the SDK emulator binary's name in PATH.
+const emulatorBinName = "emulator"
+
+// sdkRoots are the SDK locations to probe, in order: $ANDROID_HOME,
+// $ANDROID_SDK_ROOT, then the default install paths (the release target is
+// macOS; the Linux Studio default costs one extra stat elsewhere).
+func sdkRoots() []string {
+	roots := []string{os.Getenv("ANDROID_HOME"), os.Getenv("ANDROID_SDK_ROOT")}
+	if home, err := os.UserHomeDir(); err == nil {
+		roots = append(roots,
+			filepath.Join(home, "Library", "Android", "sdk"),
+			filepath.Join(home, "Android", "Sdk"),
+		)
+	}
+	return roots
+}
+
+// emulatorCandidates maps SDK roots to the emulator binary path inside each,
+// skipping empty roots.
+func emulatorCandidates(roots []string) []string {
+	c := make([]string, 0, len(roots))
+	for _, r := range roots {
+		if r != "" {
+			c = append(c, filepath.Join(r, "emulator", emulatorBinName))
+		}
+	}
+	return c
+}
+
+// pickEmulatorPath returns the first candidate that is an existing file.
+func pickEmulatorPath(candidates []string) string {
+	for _, c := range candidates {
+		if fi, err := os.Stat(c); err == nil && !fi.IsDir() {
+			return c
+		}
+	}
+	return ""
+}
+
+// findEmulator resolves the SDK `emulator` binary: PATH first (explicit
+// operator intent), then $ANDROID_HOME / $ANDROID_SDK_ROOT / the default SDK
+// locations. Anyone who has AVDs has this binary — AVDs cannot run without it
+// — so unlike the old `android` CLI there is no separate install to keep in
+// sync.
+func findEmulator() (string, error) {
+	if p, err := exec.LookPath(emulatorBinName); err == nil {
+		return p, nil
+	}
+	if p := pickEmulatorPath(emulatorCandidates(sdkRoots())); p != "" {
+		return p, nil
+	}
+	return "", NewDroidJevError("the Android SDK `emulator` binary was not found (looked in PATH, " +
+		"$ANDROID_HOME/emulator, $ANDROID_SDK_ROOT/emulator, and the default SDK locations) — install it " +
+		"with Android Studio's SDK Manager (\"Android Emulator\") or `sdkmanager --install \"emulator\"`\n" +
+		"(only auto-booting an AVD needs it; pass --device to target a running emulator)")
+}
+
+// ListAvds lists the AVDs the SDK `emulator` binary knows (`-list-avds`) — the
+// same engine that boots them, so the list cannot disagree with a boot.
 func ListAvds() ([]string, error) {
-	r, err := Run(androidCLI, []string{"emulator", "list"}, RunOpts{TimeoutMs: listAvdsTimeout})
+	bin, err := findEmulator()
+	if err != nil {
+		return nil, err
+	}
+	r, err := Run(bin, []string{"-list-avds"}, RunOpts{TimeoutMs: listAvdsTimeout})
 	if err != nil {
 		return nil, err
 	}
@@ -95,15 +156,13 @@ func ListAvds() ([]string, error) {
 		if out == "" {
 			out = string(r.Stdout)
 		}
-		return nil, NewDroidJevError("android emulator list failed: " + UTF16Truncate(Redact(JSTrim(out)), 300))
+		return nil, NewDroidJevError("emulator -list-avds failed: " + UTF16Truncate(Redact(JSTrim(out)), 300))
 	}
 	avds := []string{}
 	for _, line := range strings.Split(string(r.Stdout), "\n") {
-		l := JSTrim(line)
-		if l == "" || strings.HasPrefix(l, "Usage") {
-			continue
+		if l := JSTrim(line); l != "" {
+			avds = append(avds, l)
 		}
-		avds = append(avds, l)
 	}
 	return avds, nil
 }
@@ -349,6 +408,77 @@ func WithAnimationsOff(serial string, fn func() error) (err error) {
 	return fn()
 }
 
+// emulatorProc is a detached emulator spawn: where its output log lives (for
+// failure messages) and the channel that delivers cmd.Wait's result when the
+// process exits.
+type emulatorProc struct {
+	LogPath string
+	Exited  <-chan error
+}
+
+// startEmulator spawns `emulator -avd avd -gpu host` detached, with stdout and
+// stderr to a log file under ~/.cache/droidjev. Unlike the old
+// `android emulator start` it returns at once; boot progress is tracked
+// through adb (serial appears → sys.boot_completed=1). If the process dies
+// first, Exited delivers the exit and the log tail explains why — the one
+// thing the old blocking wrapper gave us for free.
+func startEmulator(avd string) (*emulatorProc, error) {
+	bin, err := findEmulator()
+	if err != nil {
+		return nil, err
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = "."
+	}
+	dir := filepath.Join(home, ".cache", "droidjev")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, NewDroidJevError(fmt.Sprintf("emulator log dir %s unavailable: %v", dir, err))
+	}
+	logPath := filepath.Join(dir, fmt.Sprintf("emulator-%s-%d.log", avd, time.Now().UnixMilli()))
+	logf, err := os.Create(logPath)
+	if err != nil {
+		return nil, NewDroidJevError(fmt.Sprintf("emulator log %s unavailable: %v", logPath, err))
+	}
+	cmd := exec.Command(bin, "-avd", avd, "-gpu", "host")
+	cmd.Stdout, cmd.Stderr = logf, logf
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true} // outlives droidjev, like the uia2 server
+	if err := cmd.Start(); err != nil {
+		logf.Close()
+		return nil, spawnError(bin, err)
+	}
+	exited := make(chan error, 1)
+	go func() {
+		err := cmd.Wait() // blocks for the emulator's lifetime on a good boot
+		logf.Close()
+		exited <- err
+	}()
+	return &emulatorProc{LogPath: logPath, Exited: exited}, nil
+}
+
+// logTailBytes caps the emulator log excerpt failure messages carry.
+const logTailBytes = 400
+
+// logTail is the last logTailBytes bytes of a file, trimmed and Redact'd —
+// everything printed passes Redact.
+func logTail(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil || len(b) == 0 {
+		return ""
+	}
+	return Redact(JSTrim(string(b[max(0, len(b)-logTailBytes):])))
+}
+
+// logNote is the boot-failure suffix: the emulator log's path plus its tail,
+// so a dead or stuck boot names its cause instead of timing out blind.
+func logNote(path string) string {
+	note := "\nlog: " + path
+	if tail := logTail(path); tail != "" {
+		note += "\n" + tail
+	}
+	return note
+}
+
 // BootAvd binds to an already-starting emulator for avd, or starts one and
 // waits for it to come online. Notices go to the caller's accumulator; the
 // returned EnsureResult carries Serial and Booted only.
@@ -386,7 +516,7 @@ func BootAvd(avd string, notices *[]string) (EnsureResult, error) {
 		return EnsureResult{Serial: d.Serial}, nil
 	}
 
-	addNotice(notices, fmt.Sprintf("booting AVD %s (android emulator start; this can take ~30-60s)", avd))
+	addNotice(notices, fmt.Sprintf("booting AVD %s (emulator -avd; this can take ~30-60s)", avd))
 	if err := pinHostGpu(avd, notices); err != nil {
 		return EnsureResult{}, err
 	}
@@ -398,25 +528,29 @@ func BootAvd(avd string, notices *[]string) (EnsureResult, error) {
 	for _, d := range pre {
 		preSerials[d.Serial] = struct{}{}
 	}
-	r, err := Run(androidCLI, []string{"emulator", "start", avd}, RunOpts{TimeoutMs: bootTimeoutMs})
+	proc, err := startEmulator(avd)
 	if err != nil {
 		return EnsureResult{}, err
 	}
-	if r.Code != 0 {
-		out := string(r.Stderr)
-		if out == "" {
-			out = string(r.Stdout)
-		}
-		return EnsureResult{}, NewDroidJevError(fmt.Sprintf(
-			"android emulator start %s failed: %s", avd, UTF16Truncate(Redact(JSTrim(out)), 400),
-		))
-	}
-	// `android emulator start` returns when fully booted, but the new serial may
-	// take a moment to appear in `adb devices`. Only bind to an emulator that
-	// was NOT online before we started — otherwise we'd tap a different AVD.
+	// The emulator is spawned detached and boots on its own; wait for its NEW
+	// serial in `adb devices`. Only bind to an emulator that was NOT online
+	// before we started — otherwise we'd tap a different AVD. An early exit
+	// (bad AVD name, broken image, rejected -gpu) fails fast with the log tail
+	// instead of waiting out the whole serial deadline.
 	serial := ""
 	deadline := time.Now().UnixMilli() + bootSerialMs
 	for time.Now().UnixMilli() < deadline && serial == "" {
+		select {
+		case waitErr := <-proc.Exited:
+			why := "exited 0"
+			if waitErr != nil {
+				why = waitErr.Error()
+			}
+			return EnsureResult{}, NewDroidJevError(fmt.Sprintf(
+				"emulator for %s exited during startup (%s)%s", avd, why, logNote(proc.LogPath),
+			))
+		default:
+		}
 		now, err := AdbDevices()
 		if err != nil {
 			return EnsureResult{}, err
@@ -443,7 +577,8 @@ func BootAvd(avd string, notices *[]string) (EnsureResult, error) {
 	}
 	if serial == "" {
 		return EnsureResult{}, NewDroidJevError(fmt.Sprintf(
-			"emulator %s started but its serial never appeared in adb devices (new emulators seen: none)", avd,
+			"emulator %s started but its serial never appeared in adb devices (new emulators seen: none)%s",
+			avd, logNote(proc.LogPath),
 		))
 	}
 	ok, err := waitBoot(serial, waitBootMs)
@@ -452,7 +587,7 @@ func BootAvd(avd string, notices *[]string) (EnsureResult, error) {
 	}
 	if !ok {
 		return EnsureResult{}, NewDroidJevError(fmt.Sprintf(
-			"emulator %s (%s) did not reach sys.boot_completed=1", avd, serial,
+			"emulator %s (%s) did not reach sys.boot_completed=1%s", avd, serial, logNote(proc.LogPath),
 		))
 	}
 	if err := WakeAndUnlock(serial); err != nil {
@@ -622,7 +757,7 @@ func EnsureDevice(device string) (EnsureResult, error) {
 		return EnsureResult{}, err
 	}
 	if len(avds) == 0 {
-		return EnsureResult{}, NewDroidJevError("no devices online and no AVDs found (`android emulator list`)")
+		return EnsureResult{}, NewDroidJevError("no devices online and no AVDs found (`emulator -list-avds`)")
 	}
 	addNotice(&notices, fmt.Sprintf(`no device online; using first AVD "%s"`, avds[0]))
 	res, err := BootAvd(avds[0], &notices)
