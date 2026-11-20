@@ -1,4 +1,4 @@
-// Ports the matchRows cases from the frozen Node implementation:
+// matchRows ranking:
 // exact quoted label beats substring, clickable beats not, topmost wins ties.
 // The ` holds [..]` containment marker is internal metadata, not searchable
 // text — a query like "14" must not hit an index list.

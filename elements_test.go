@@ -1,6 +1,5 @@
-// Element-table tests ported from the Node implementation's element-table
-// section.
-// Expected rows were captured from the frozen Node implementation; the one
+// Element-table tests.
+// Expected rows are pinned; the one
 // deliberate divergence is UTF16Truncate dropping a straddled emoji whole
 // (ruling R6b) instead of leaving the lone surrogate JS's slice() produces.
 
@@ -18,7 +17,7 @@ func testScreen() *Screen { return &Screen{W: 1344, H: 2992} }
 // screenOf keeps the ad-hoc screen literals below readable.
 func screenOf(w, h int) *Screen { return &Screen{W: w, H: h} }
 
-// elAt builds an element the way the Node tests' `mk` helper did: empty
+// elAt builds an element:
 // text/ids, rounded center, every flag false, then mod applies the test's own
 // fields.
 func elAt(cls string, l, t, r, b int, mod func(*Element)) *Element {

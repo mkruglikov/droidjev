@@ -64,8 +64,8 @@ func TestSanitizeAccepts(t *testing.T) {
 	}
 }
 
-// Every rejected string names its offending characters exactly as the Node
-// port does: each distinct code point once, in first-occurrence order, joined
+// Every rejected string names its offending characters: each distinct code
+// point once, in first-occurrence order, joined
 // with a space and JSON.stringify-quoted.
 func TestSanitizeRejects(t *testing.T) {
 	badMsg := func(bad string) string {
@@ -144,7 +144,7 @@ func TestSanitizeSpaceEscape(t *testing.T) {
 	}
 }
 
-// Numbers ported from the Node implementation: the track midpoint is x1, the
+// The track midpoint is x1, the
 // target is l + fraction*(r-l), and the extremes overshoot the track by 40px
 // so the value clamps to min/max. Duration is always 400ms.
 func TestSlideGesture(t *testing.T) {

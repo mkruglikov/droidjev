@@ -5,7 +5,7 @@
 //   - responses are strictly validated before any answer is trusted; on any
 //     validation failure nothing downstream executes
 //
-// Ported from the Node implementation: wire shapes, retry policy, byte caps,
+// Wire shapes, retry policy, byte caps,
 // and every error message are kept word for word.
 
 package main

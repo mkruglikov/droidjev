@@ -1,7 +1,7 @@
 // Tests for the resident uia2 server lifecycle. Everything here is offline:
 // port allocation, hash verification, and the pinned-APK install pipeline with
 // its fetch/cache/adb seams injected. Ensure/Source/SetClipboard/Stop drive a
-// real device and stay untested, like the Node suite.
+// real device and stay untested.
 package main
 
 import (

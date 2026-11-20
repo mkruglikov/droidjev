@@ -1,7 +1,6 @@
 // One-screen capture shared by snapshot/find/act: screen size + focused app +
 // layout dump + element table.
 //
-// Ported from the Node implementation.
 
 package main
 
@@ -19,8 +18,8 @@ type Snapshot struct {
 
 // TakeSnapshot captures the current screen, focused app, and element table.
 //
-// The Node version fetches `wm size`, `dumpsys window`, and the layout dump
-// concurrently with Promise.all; here they run sequentially — the extra ~50ms
+// `wm size`, `dumpsys window`, and the layout dump could run concurrently;
+// here they run sequentially — the extra ~50ms
 // on the cold path is not worth a goroutine error fan-in (controller-approved
 // lazy default).
 func TakeSnapshot(serial string) (*Snapshot, error) {

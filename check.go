@@ -4,7 +4,7 @@
 // a strict verdict back: the model's answers are validated like every other
 // model answer, and an empty state is never mistaken for an impossibility.
 //
-// Ported from the Node implementation. The prompt text is byte-identical (it
+// The prompt text is byte-identical (it
 // is prompt text), and the one screenshot is sent only after the model is
 // pinned.
 

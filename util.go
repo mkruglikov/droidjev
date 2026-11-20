@@ -3,7 +3,7 @@
 // - every subprocess has a timeout and bounded output collection
 // - anything headed for logs/errors passes through Redact
 //
-// Ported from the Node implementation; messages are kept word for word.
+// Messages are kept word for word.
 
 package main
 
@@ -70,7 +70,7 @@ func Redact(s string) string {
 }
 
 // installHints are the human-readable install hints for missing external
-// tools, word for word from the Node implementation.
+// tools.
 var installHints = map[string]string{
 	"adb":     "\"adb\" is not installed or not in PATH — install Android platform-tools:\n  https://developer.android.com/tools/releases/platform-tools",
 	"android": "the \"android\" CLI is not installed or not in PATH — install it:\n  https://developer.android.com/cli/install\n(only auto-booting an AVD needs it; pass --device to target a running emulator)",
@@ -91,8 +91,8 @@ func spawnError(file string, err error) *DroidJevError {
 	return NewDroidJevError(fmt.Sprintf("failed to start %q: %v", file, err))
 }
 
-// RunOpts mirrors run()'s options object; zero values take the Node defaults.
-// Binary is accepted for parity with the Node API but has no effect: Stdout is
+// RunOpts mirrors run()'s options object; zero values take the defaults.
+// Binary is accepted for API parity but has no effect: Stdout is
 // always the raw bytes (`binary: true` only opted out of a UTF-8 decode Go
 // never does).
 type RunOpts struct {
@@ -101,8 +101,8 @@ type RunOpts struct {
 	Binary    bool
 }
 
-// RunResult mirrors the object run() resolves with. Stdout is []byte instead
-// of Node's string/Buffer split; Stderr is decoded, as it always was.
+// RunResult mirrors the object run() resolves with. Stdout is raw []byte,
+// Stderr is decoded, as it always was.
 type RunResult struct {
 	Code   int
 	Stdout []byte

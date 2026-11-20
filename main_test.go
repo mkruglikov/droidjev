@@ -1,5 +1,5 @@
-// main.go tests: the CLI surface ported from the Node implementation's CLI
-// section, plus the usage/version gate and the act exit-code mapping.
+// main.go tests: the CLI surface, plus the usage/version gate and the act
+// exit-code mapping.
 
 package main
 

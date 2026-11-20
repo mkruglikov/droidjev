@@ -1,4 +1,4 @@
-// Ports the trace cases from the frozen Node implementation: a
+// Tracing: a
 // traced episode is one 0600 JSONL file per run, every line passes through
 // Redact, and a trace that cannot write disables itself with one notice
 // instead of failing the episode.
@@ -127,7 +127,7 @@ func TestTraceRedactsAndDisables(t *testing.T) {
 	})
 
 	if OpenTrace(false, "g", "s", t.TempDir()) != nil {
-		t.Fatal("OpenTrace(false) must be nil, like the Node null")
+		t.Fatal("OpenTrace(false) must be nil")
 	}
 }
 

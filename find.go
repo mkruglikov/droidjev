@@ -2,9 +2,9 @@
 // (tap | scroll) → repeat. No model calls — a long alphabetized list is a code
 // problem, not a judgment problem.
 //
-// Ported from the Node implementation: ranking, the hash-stall
-// wake-and-retry-once, the 60% scroll, the 600ms settle, and both stop reasons
-// are kept exact. One deliberate divergence: the Node loop only scrolled down,
+// Ranking, the hash-stall wake-and-retry-once, the 60% scroll, the 600ms
+// settle, and both stop reasons are kept exact. One deliberate divergence:
+// earlier versions only scrolled down,
 // so a label above the starting position was unreachable; this scan scrolls to
 // the top of the list first (an up-scroll that changes nothing twice), then
 // walks down — end_of_list is now an exhaustive verdict.
@@ -108,8 +108,8 @@ type findIO struct {
 // FindLabel scrolls the screen looking for label, optionally tapping the best
 // match. The scan runs in two phases: it first scrolls UP until the screen
 // stops changing (the top of the list — a label can sit above the position
-// the run starts from), then scans DOWN through the whole list. The Node
-// implementation only scrolled down.
+// the run starts from), then scans DOWN through the whole list (earlier
+// versions only scrolled down).
 func FindLabel(opts FindOpts) (FindResult, error) {
 	return findScan(opts, findIO{
 		Snapshot: TakeSnapshot,

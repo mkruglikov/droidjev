@@ -2,9 +2,8 @@
 // bytes → downscaled RGB → PNG, sent to TypeSafe as an image asset only when the
 // view hierarchy is empty.
 //
-// Ported from the Node implementation. The PNG is stdlib image/png: validity
-// and dimensions are the contract, not byte-equality with the original
-// encoder.
+// The PNG is stdlib image/png: validity and dimensions are the contract, not
+// byte-equality with a specific encoder.
 
 package main
 
@@ -101,7 +100,7 @@ func ScaleTarget(w, h int) (int, int) {
 // Alpha is dropped — display captures are opaque.
 //
 // src must be a 4-byte-per-pixel capture (format 1): four bytes are read per
-// source pixel, exactly as in the Node code, which ScreenshotPng guarantees by
+// source pixel, which ScreenshotPng guarantees by
 // rejecting other formats before calling this.
 func DownscaleRGBA(buf []byte, src Screencap, dw, dh int) []byte {
 	out := make([]byte, dw*dh*3)

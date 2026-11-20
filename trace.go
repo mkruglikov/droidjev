@@ -4,7 +4,7 @@
 // screen text, typed values and answers. The file is created 0o600 and is
 // never written inside the repo.
 //
-// Ported from the Node implementation: the header/step/result shapes, the
+// The header/step/result shapes, the
 // millisecond stamp plus random suffix, the slug, and the
 // disable-on-error-once behavior are kept exact.
 
@@ -26,12 +26,12 @@ import (
 )
 
 // traceStderr receives the one-time "trace disabled" notice. It is a package
-// var so tests can capture it, the same way the Node tests stub console.error.
+// var so tests can capture it.
 var traceStderr io.Writer = os.Stderr
 
 // Trace is an open episode trace. File is "" for a trace disabled by an
 // unusable home directory; every method is a no-op on a nil or disabled Trace
-// (the Node code's `trace?.recordStep`).
+// (optional chaining, `trace?.recordStep` style).
 type Trace struct {
 	File     string
 	dir      string
@@ -55,7 +55,7 @@ type TraceStep struct {
 }
 
 // OpenTrace starts a trace file and writes its header. A nil Trace (traced
-// disabled) mirrors the Node `null`; every method tolerates it.
+// disabled) is nil; every method tolerates it.
 //
 // dir == "" means the default ~/.cache/droidjev/runs. When even the home
 // directory is unavailable the trace disables itself rather than writing into
@@ -167,7 +167,7 @@ func (t *Trace) appendLine(line string) error {
 }
 
 // traceField is one key/value pair of a JSON object, kept in insertion order
-// like the Node object literal.
+// like a JSON object.
 type traceField struct {
 	key string
 	val any

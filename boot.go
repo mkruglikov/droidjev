@@ -2,7 +2,7 @@
 // auto-boot the first AVD when nothing is online. The `android` CLI is fine
 // here (cold path); the per-step hot loop stays adb-only.
 //
-// Ported from the Node implementation; every notice string, wait, timeout, and
+// Every notice string, wait, timeout, and
 // error message is kept word for word.
 
 package main
@@ -32,7 +32,7 @@ var (
 	// on the host. The `android` CLI takes no -gpu passthrough, so the AVD's own
 	// config.ini is the only lever.
 	// JS `.` excludes \n, \r, U+2028 and U+2029; spell that out so a CRLF
-	// config keeps its \r, exactly like the Node replace.
+	// config keeps its \r.
 	gpuEnabledRe = regexp.MustCompile(`(?m)^hw\.gpu\.enabled[` + JSWhitespaceClass + `]*=[^\n\r\x{2028}\x{2029}]*`)
 	gpuModeRe    = regexp.MustCompile(`(?m)^hw\.gpu\.mode[` + JSWhitespaceClass + `]*=[^\n\r\x{2028}\x{2029}]*`)
 
@@ -250,7 +250,7 @@ func WakeAndUnlock(serial string) error {
 	return nil
 }
 
-// SIGINTExitCode mirrors the Node `process.exitCode = 130` side effect of the
+// SIGINTExitCode mirrors the 130 (128+SIGINT) exit of the
 // first Ctrl-C during WithAnimationsOff: the restore still runs and fn's error
 // is returned; the CLI reads this afterwards to exit 130. Set to 0 the rest of
 // the time.
@@ -300,7 +300,7 @@ func WithAnimationsOff(serial string, fn func() error) (err error) {
 	}
 
 	// Best effort — running with animations on is only slower, not wrong. A
-	// failed read skips the disable loop entirely, as the Node catch does.
+	// failed read skips the disable loop entirely.
 	ok := true
 	for _, k := range animScales {
 		v, err := get(k)
@@ -600,7 +600,7 @@ func EnsureDevice(device string) (EnsureResult, error) {
 				return EnsureResult{}, err
 			}
 			if name == "" {
-				name = "null" // `${null}` in the Node template literal
+				name = "null" // JS `${null}` renders the string "null"
 			}
 			lines[i] = "  --device " + d.Serial + "   (avd " + name + ")"
 		}

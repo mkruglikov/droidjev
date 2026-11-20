@@ -1,6 +1,6 @@
 // The goal loop's decision tests: the ask/verify/retry policy, the vision
-// step, and offline episodes driven through the IO seam. Ported from the Node
-// implementation's runGoal section — the stubs replace every device call, so
+// step, and offline episodes driven through the IO seam — the stubs replace
+// every device call, so
 // no emulator and no network are involved.
 
 package main
@@ -1338,7 +1338,7 @@ func TestAgentStateKeyOrder(t *testing.T) {
 	if strings.Contains(s, `"seen_before"`) {
 		t.Errorf("seen_before must be omitted when false: %s", s)
 	}
-	// No note is JSON null, present-not-omitted (the Node `elements_note: null`).
+	// No note is JSON null, present-not-omitted.
 	if !strings.Contains(s, `"elements_note":null`) {
 		t.Errorf("empty elements_note must be present and null: %s", s)
 	}

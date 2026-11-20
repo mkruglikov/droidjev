@@ -4,7 +4,7 @@
 // copy_<idx> for concrete elements (plus scroll/back/home/paste/wait/done/
 // blocked) alongside a parallel `goal_met` judgment.
 //
-// Ported from the Node implementation. Prompt parity is the mandate: every
+// Prompt parity is the mandate: every
 // rule string is copied verbatim and criteria are built into *OrdMap in the
 // exact JS insertion order, because criteria key order IS prompt order.
 //

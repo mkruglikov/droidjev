@@ -3,8 +3,8 @@
 // fallback) from a strictly validated box of 0-1 fractions. The model never
 // produces raw coordinates, selectors, or commands.
 //
-// Ported from the Node implementation: wire shapes, gesture math, messages,
-// and the typed text charset are kept exact.
+// Wire shapes, gesture math, messages, and the typed text charset are kept
+// exact.
 
 package main
 
@@ -14,7 +14,7 @@ import (
 	"strings"
 )
 
-// KEYS from the Node implementation. paste (279) rides the focused field, so
+// paste (279) rides the focused field, so
 // callers must focus one first (a tap).
 const (
 	KeyBack  = 4

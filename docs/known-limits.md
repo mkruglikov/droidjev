@@ -14,8 +14,7 @@
   [security model](security.md)); no IME/emoji.
 - Label truncation cuts at a UTF-16 boundary. When an astral character (an
   emoji or similar) straddles the cut, the whole character is dropped instead
-  of leaving half a surrogate pair (the Node implementation kept the lone
-  surrogate).
+  of leaving half a surrogate pair.
 - A device locked with a PIN/pattern/password cannot be driven — keys cannot
   dismiss a secure keyguard. It is reported up front as blocked (exit 2, "secure
   lock screen") instead of leaving the run to flail on the lock screen; unlock

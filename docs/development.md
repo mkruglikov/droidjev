@@ -15,9 +15,9 @@ go build -o /tmp/droidjev .   # build a binary
 ```
 
 The prompt goldens under `testdata/golden/` are byte-equality gates: every
-question droidjev builds is compared with the fixture. They were captured from
-the former Node implementation and are never regenerated in CI; changing a
-prompt string means updating the matching fixture deliberately.
+question droidjev builds is compared with the fixture. They are never
+regenerated in CI; changing a prompt string means updating the matching fixture
+deliberately.
 
 `--trace` (or `DROIDJEV_TRACE=1`) records a run to
 `~/.cache/droidjev/runs/` as JSONL. These are local diagnostics for one

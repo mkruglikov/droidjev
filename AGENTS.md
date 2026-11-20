@@ -121,14 +121,12 @@ go run . <cmd>                # run the CLI in place
   sentence split (`(?<=[.!?])\s+` lookbehind), `GoalTexts`' route-endpoint
   terminator (`(?=[.!?]|,\s+(?:and|then)\b|$)`), and `KeypadSequence`'s
   leading-zero strip (`^0+(?=\d)`). Change them only with the goldens.
-- **Golden fixtures are byte-equality gates.** `testdata/golden/` was generated
-  from the Node implementation before its deletion; the Go tests rebuild every
-  question and compare bytes. There is no generator in the tree anymore —
-  regenerate only by checking out the commit before the Node removal and
-  running `test/golden-generate.mjs` there.
+- **Golden fixtures are byte-equality gates.** The Go tests rebuild every
+  question and compare bytes against `testdata/golden/`. There is no generator
+  in the tree — regenerate only by checking out the commit before the rewrite
+  and running `test/golden-generate.mjs` there.
 - `UTF16Truncate` drops a straddled surrogate pair whole (the emoji is removed,
-  not halved). The Node implementation left a lone surrogate; the Go choice is
-  deliberate and recorded in docs/known-limits.md.
+  not halved) — a deliberate choice recorded in docs/known-limits.md.
 - The hot loop must never shell out to the `android` CLI (~670 ms startup tax);
   raw adb only. The `android` CLI is used solely to boot an AVD.
 - UiAutomation is exclusive device-wide: the resident uia2 server displaces the

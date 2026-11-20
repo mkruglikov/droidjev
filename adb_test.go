@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// Ports the `adb devices -l` parse from the frozen Node implementation: the
+// The `adb devices -l` parse: the
 // header line is dropped, the state alternatives are tried in JS order, and
 // `model:` is picked out of the trailing attribute list. A missing model is
 // the empty string (the original's null).
@@ -32,7 +32,7 @@ func TestAdbDevicesParse(t *testing.T) {
 		t.Fatalf("parseDevicesList = %#v, want %#v", got, want)
 	}
 
-	// The Node function resolves [] for a header-only listing, and [] marshals
+	// A header-only listing resolves to [], and [] marshals
 	// as `[]` where nil would marshal as `null` — keep it non-nil.
 	empty := parseDevicesList("List of devices attached\n")
 	if empty == nil || len(empty) != 0 {
@@ -138,8 +138,8 @@ func fakeAdb(t *testing.T, script string) {
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
-// A failing shell call reports the joined argv and the trimmed stderr, capped
-// like the Node code, as a DroidJevError (exit 3).
+// A failing shell call reports the joined argv and the trimmed stderr, capped,
+// as a DroidJevError (exit 3).
 func TestShellOkError(t *testing.T) {
 	fakeAdb(t, "echo 'boom: denied' >&2\nexit 7")
 	_, err := ShellOk("emulator-5554", []string{"input", "tap", "10", "20"}, RunOpts{})

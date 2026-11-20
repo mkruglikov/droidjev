@@ -12,7 +12,7 @@
 // order: "assign" folds options in before the fixed ops (digits_0), "post"
 // runs after them in registry order, "postStuck" after the loop withdrawals.
 //
-// Ported from the Node implementation. Two patterns need RE2 emulation: JS's
+// Two patterns need RE2 emulation: JS's
 // `^0+(?=\d)` lookahead and the route pattern's terminator lookahead.
 
 package main

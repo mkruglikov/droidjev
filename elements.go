@@ -2,7 +2,7 @@
 // should see, give them stable indices, and serialize compact rows. The model
 // only ever sees rows like `[12] click "About phone"` — never coordinates.
 //
-// Ported from the Node implementation. JS's non-enumerable array props
+// JS's non-enumerable array props
 // (`truncated`, `grid`) live on Table here.
 
 package main
@@ -520,7 +520,7 @@ func ContainsBounds(outer, inner Bounds) bool {
 
 // centerOf: providers set center alongside bounds; a host-supplied table may
 // not, and a gesture needs a point either way. A nil element or bounds yields
-// the zero point rather than a panic (the Node code's caught TypeError).
+// the zero point rather than a panic.
 func centerOf(el *Element) Point {
 	if el == nil {
 		return Point{}

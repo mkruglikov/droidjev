@@ -1,4 +1,4 @@
-// Ports the pinHostGpuIni cases from the frozen Node implementation: an AVD
+// pinHostGpuIni: an AVD
 // with hw.gpu.enabled = no renders on the CPU and starves the host, so the
 // config.ini text is repinned to the host GPU.
 package main

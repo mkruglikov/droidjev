@@ -1,4 +1,4 @@
-// Question-builder tests ported from the Node implementation, plus the prompt
+// Question-builder tests, plus the prompt
 // parity gate: every golden in testdata/golden/ is rebuilt here and compared
 // byte for byte with the original output.
 

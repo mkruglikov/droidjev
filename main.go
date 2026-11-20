@@ -1,7 +1,6 @@
 // Command droidjev is a fast jev-powered Android emulator clicker, text-first:
 // it dumps the view hierarchy and taps the element that advances the goal.
-// Ported from the Node implementation; messages, JSON shapes and exit codes
-// are kept word for word.
+// Messages, JSON shapes and exit codes are kept word for word.
 package main
 
 import (
@@ -103,7 +102,7 @@ var valueFlags = map[string]bool{
 }
 
 // Flags is parseArgs' result. The zero value is "flag absent": empty Texts /
-// Apps / Guidance are the Node null, and MaxSteps/MaxIterations 0 choose the
+// Apps / Guidance render as null, and MaxSteps/MaxIterations 0 choose the
 // command defaults.
 type Flags struct {
 	Args          []string

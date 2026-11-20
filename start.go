@@ -1,9 +1,8 @@
 // Deterministic app launch by package: resolve the launcher activity, start
 // it; fall back to monkey. Launching an app is not a judgment problem either.
 //
-// Ported from the Node implementation; the package-name validation, the
-// component preference, the monkey fallback, and the focus polling timings are
-// kept exact.
+// The package-name validation, the component preference, the monkey fallback,
+// and the focus polling timings are kept exact.
 
 package main
 
@@ -21,8 +20,8 @@ var resolveActivityLineRe = regexp.MustCompile(
 )
 
 // StartResult is the outcome of StartApp. Component is "" when resolve-activity
-// found none (the Node null); App is nil when no window is focused (the
-// launcher, keyguard, or a notification shade).
+// found none; App is nil when no window is focused (the launcher,
+// keyguard, or a notification shade).
 type StartResult struct {
 	Pkg       string
 	Component string

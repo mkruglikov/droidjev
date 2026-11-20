@@ -1,5 +1,4 @@
-// check.go tests, ported from the Node tests (the check section), plus the
-// prompt parity gate for the check questions.
+// check.go tests, plus the prompt parity gate for the check questions.
 
 package main
 

@@ -1,7 +1,7 @@
 // Insertion-ordered collections. JavaScript object property order is prompt
 // order: buildQuestions' criteria key order is semantic (the model can see
-// it), while Go maps marshal alphabetically. OrdMap/OrdSet keep the order the
-// Node implementation got for free; MarshalNumericKeys reproduces JS's
+// it), while Go maps marshal alphabetically. OrdMap/OrdSet keep that order
+// explicit; MarshalNumericKeys reproduces JS's
 // integer-first key ordering for maps that arrive as plain Go maps.
 
 package main

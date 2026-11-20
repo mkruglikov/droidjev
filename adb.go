@@ -2,7 +2,7 @@
 // a shell. The hot loop must never shell out to the `android` CLI (~670ms
 // startup tax); adb is ~14ms per call.
 //
-// Ported from the Node implementation; the call timeouts and the regexes
+// The call timeouts and the regexes
 // (including JS `\s`, spelled with JSWhitespaceClass) are kept exact.
 
 package main
@@ -17,7 +17,7 @@ import (
 const adb = "adb"
 
 // Device is one `adb devices -l` row. Model is "" when the listing had no
-// `model:` attribute (the Node code's null); --json callers render "" as null.
+// `model:` attribute; --json callers render "" as null.
 type Device struct {
 	Serial string
 	State  string
@@ -33,7 +33,7 @@ type Screen struct {
 }
 
 // The fallback viewport every screen-size consumer assumes when `wm size`
-// reports nothing: the 1080x2340 phone panel the Node port hardcoded.
+// reports nothing: a hardcoded 1080x2340 phone panel.
 const (
 	defaultScreenW = 1080
 	defaultScreenH = 2340
@@ -81,7 +81,7 @@ func AdbDevices() ([]Device, error) {
 
 // parseDevicesList skips the `List of devices attached` header and picks the
 // serial, state, and `model:` out of each row. A header-only listing is an
-// empty, non-nil slice: the CLI marshals it as [] like the Node code, not null.
+// empty, non-nil slice: the CLI marshals it as [], not null.
 func parseDevicesList(stdout string) []Device {
 	devices := []Device{}
 	for _, line := range strings.Split(stdout, "\n")[1:] {
@@ -104,8 +104,7 @@ func IsEmulatorSerial(s string) bool { return emulatorSerialRe.MatchString(s) }
 var emulatorSerialRe = regexp.MustCompile(`^emulator-[0-9]+$`)
 
 // AvdName is the AVD display name for a running emulator; "" for physical
-// devices, failures, or the bare "OK" reply (the Node null; --json renders it
-// as null).
+// devices, failures, or the bare "OK" reply; --json renders "" as null.
 func AvdName(serial string) (string, error) {
 	r, err := Run(adb, []string{"-s", serial, "emu", "avd", "name"}, RunOpts{TimeoutMs: 6000})
 	if err != nil {

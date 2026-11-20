@@ -1,5 +1,5 @@
-// JavaScript string semantics the Node implementation depends on. The prompts
-// must be byte-identical to the Node port, so every place that measured with
+// JavaScript string semantics the prompts depend on. Every place that
+// measured with
 // `.length`, cut with `.slice()`, trimmed with `.trim()` or quoted with
 // `JSON.stringify()` goes through these helpers instead of the Go defaults.
 

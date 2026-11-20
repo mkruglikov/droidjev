@@ -2,7 +2,7 @@
 // A dump is one adb-forwarded HTTP call; the server is installed on first use
 // and kept resident across commands.
 //
-// Ported from the Node implementation. The tokenizer is hand-written on
+// The tokenizer is hand-written on
 // purpose: the server's XML is machine-generated and mostly attribute-only,
 // and the original tolerated shapes encoding/xml rejects (a literal '>' inside
 // a quoted attribute, unknown class-named tags, mismatched close tags). Keep
@@ -36,10 +36,10 @@ type Point struct {
 
 // Element is one parsed node. It is the data model the whole program consumes
 // (element tables, taps, decide requests). ParentIdx is the index of the
-// parent element, or -1 when the parent is the <hierarchy> root (the Node
-// code's null); Children holds indices of direct children in dump order.
+// parent element, or -1 when the parent is the <hierarchy> root; Children
+// holds indices of direct children in dump order.
 //
-// Pkg is "" where the Node code had null (the tag omitted package).
+// Pkg is "" when the tag omitted package.
 type Element struct {
 	Class         string  `json:"class"`
 	Pkg           string  `json:"pkg"`
