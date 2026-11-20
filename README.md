@@ -59,17 +59,19 @@ binary.
    `export TYPESAFE_API_KEY=…` to your shell profile.
 2. **droidjev itself** — download the latest macOS (Apple Silicon) build from
    the [GitHub Releases page](https://github.com/mkruglikov/droidjev/releases),
-   or, for `v0.5.0`:
+   or, for `0.5.1`:
    ```bash
-   curl -L https://github.com/mkruglikov/droidjev/releases/download/v0.5.0/droidjev-0.5.0-darwin-arm64.tar.gz | tar xz
-   sudo install -m 755 droidjev /usr/local/bin/   # or /opt/homebrew/bin on Apple Silicon
+   curl -LO https://github.com/mkruglikov/droidjev/releases/download/0.5.1/droidjev-0.5.1-darwin-arm64
+   sudo install -m 755 droidjev-0.5.1-darwin-arm64 /usr/local/bin/droidjev   # or /opt/homebrew/bin on Apple Silicon
    ```
-   Each tarball ships with a `.sha256` file; download it too and verify with
-   `shasum -a 256 -c droidjev-0.5.0-darwin-arm64.tar.gz.sha256`. On another
+   Release assets don't carry the executable bit, hence `install -m 755` (or
+   `chmod +x` if you keep the file). Each binary ships with a `.sha256` file;
+   download it too and verify with
+   `shasum -a 256 -c droidjev-0.5.1-darwin-arm64.sha256`. On another
    OS/architecture, build from source — see
    [Development](https://github.com/mkruglikov/droidjev/blob/master/docs/development.md).
-   A tarball downloaded through a browser keeps the Gatekeeper quarantine
-   attribute and may be refused on first run; the `curl | tar` form above does
+   A binary downloaded through a browser keeps the Gatekeeper quarantine
+   attribute and may be refused on first run; the `curl` form above does
    not carry it, and code signing is a stated non-goal.
 3. **Verify:** `droidjev devices` — with an emulator up it lists it;
    `no devices online` is fine too (`droidjev boot` boots the first AVD).

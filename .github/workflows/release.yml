@@ -11,18 +11,18 @@ jobs:
       contents: write # gh release upload needs to write release assets
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6 # v6 runs on Node 24 (v5 trips the Node 20 deprecation warning)
         with:
           go-version-file: go.mod
+          cache: false # zero-dependency repo: no go.sum, cache lookup just warns
       - name: build darwin/arm64 binary and checksum
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o droidjev .
-          tar czf "droidjev-${VERSION}-darwin-arm64.tar.gz" droidjev
-          shasum -a 256 "droidjev-${VERSION}-darwin-arm64.tar.gz" > "droidjev-${VERSION}-darwin-arm64.tar.gz.sha256"
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o "droidjev-${VERSION}-darwin-arm64" .
+          shasum -a 256 "droidjev-${VERSION}-darwin-arm64" > "droidjev-${VERSION}-darwin-arm64.sha256"
       - name: upload release assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          gh release upload "$GITHUB_REF_NAME" "droidjev-${VERSION}-darwin-arm64.tar.gz" "droidjev-${VERSION}-darwin-arm64.tar.gz.sha256" --clobber
+          gh release upload "$GITHUB_REF_NAME" "droidjev-${VERSION}-darwin-arm64" "droidjev-${VERSION}-darwin-arm64.sha256" --clobber

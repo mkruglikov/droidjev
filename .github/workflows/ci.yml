@@ -10,9 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6 # v6 runs on Node 24 (v5 trips the Node 20 deprecation warning)
         with:
           go-version-file: go.mod
+          cache: false # zero-dependency repo: no go.sum, cache lookup just warns
       - name: gofmt
         run: test -z "$(gofmt -l .)"
       - name: go vet

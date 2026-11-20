@@ -24,11 +24,11 @@ go run . <cmd>                # run the CLI in place
 
 - CI (`.github/workflows/ci.yml`) gates every push/PR: gofmt, `go vet`,
   `go test`, and a darwin/arm64 cross-compile of the release target.
-- Publish by creating a GitHub Release tagged `vX.Y.Z`: `release.yml`
+- Publish by creating a GitHub Release tagged `X.Y.Z`: `release.yml`
   cross-compiles `GOOS=darwin GOARCH=arm64` (CGO off, `-trimpath`, `-s -w`,
-  `-X main.version=${VERSION}` with the tag's leading `v` stripped), packs
-  `droidjev-VERSION-darwin-arm64.tar.gz`, writes a `.sha256` next to it, and
-  uploads both as release assets.
+  `-X main.version=${VERSION}` with the tag's leading `v` stripped), uploads
+  the naked `droidjev-VERSION-darwin-arm64` binary and a `.sha256` next to it
+  as release assets.
 - The version lives in the release tag; `main.version` is `"dev"` in a local
   build. Nothing else in the tree carries a version to bump — the release tag
   is the version.
